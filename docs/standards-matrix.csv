@@ -1,0 +1,53 @@
+standard,protocol_version,message_id,message_name,direction,status,code,evidence,gap
+JT/T 808,JT/T 808-2019,frame,帧转义/校验/BCD,terminal-platform,done,jt808/codec.rs,unit tests+subpackage limits,无
+JT/T 808,JT/T 808-2019,0x0100,终端注册,terminal-platform,partial,jt808/gateway/registration.rs,dual layout + plate number + terminal_profiles,2019字段宽度待授权全文核对
+JT/T 808,JT/T 808-2019,0x0102,终端鉴权,terminal-platform,done,jt808/gateway/registration.rs,unit/integration,鉴权码明文存储未改
+JT/T 808,JT/T 808-2019,0x0002,心跳,terminal-platform,done,jt808/gateway/registration.rs,unit/integration,无
+JT/T 808,JT/T 808-2019,0x0001,终端通用应答,terminal-platform,done,jt808/gateway/downlink.rs,unit/integration,无
+JT/T 808,JT/T 808-2019,0x0200,位置汇报,terminal-platform,partial,jt808/codec.rs,unit test,常见语义(含0x04/0x25/0x11/0x12/0x13)+原始TLV+截断/范围拒绝
+JT/T 808,JT/T 808-2019,0x0704,批量位置,terminal-platform,partial,jt808/codec.rs; jt808/gateway/location.rs; db/telemetry.rs,unit test+claim table+chronological sort,200条/64KB/10秒20批限流/并发claim；分片未完成
+JT/T 808,JT/T 808-2019,0x0201,位置查询应答,terminal-platform,done,jt808/codec.rs,unit test,无
+JT/T 808,JT/T 808-2019,0x8001,通用应答,platform-terminal,done,jt808.rs,unit test,无
+JT/T 808,JT/T 808-2019,0x8100,注册应答,platform-terminal,done,jt808.rs,unit test,无
+JT/T 808,JT/T 808-2019,0x8103,设置终端参数,platform-terminal,partial,src/api/terminal_downlink.rs,API+audit+persisted+version history+diff+retry,版本冲突/超时重试未完成
+JT/T 808,JT/T 808-2019,0x8104,查询全部参数,platform-terminal,partial,src/api/terminal_downlink.rs,API+response storage,参数差异/重试未完成
+JT/T 808,JT/T 808-2019,0x8105,终端控制,platform-terminal,partial,src/api/terminal_downlink.rs,API+audit,flag按厂商profile
+JT/T 808,JT/T 808-2019,0x8106,查询指定参数,platform-terminal,partial,src/api/terminal_downlink.rs,API,无响应差异落库
+JT/T 808,JT/T 808-2019,0x8107,查询终端属性,platform-terminal,partial,src/api/terminal_downlink.rs,API+response storage,字段宽度待核对
+JT/T 808,JT/T 808-2019,0x8201,位置查询,platform-terminal,done,src/api/terminal_downlink.rs,API,无
+JT/T 808,JT/T 808-2019,0x8202,临时跟踪,platform-terminal,partial,src/api/terminal_downlink.rs; jt808.rs,API+ACK state,跨节点状态不共享
+JT/T 808,JT/T 808-2019,0x8203,告警确认,platform-terminal,partial,jt808/control.rs; src/api/terminal_downlink.rs,unit test candidate 2+4 body,字段/厂商差异待真实样本
+JT/T 808,JT/T 808-2019,0x8204,链路检测,platform-terminal,partial,src/api/terminal_downlink.rs; jt808.rs,API+ACK state,统计聚合未实现
+JT/T 808,JT/T 808-2019,0x8300,文本消息,platform-terminal,partial,jt808/control.rs; src/api/terminal_downlink.rs,unit test GBK,无终端送达确认
+JT/T 808,JT/T 808-2019,0x8301-0x8304,事件/菜单/服务,platform-terminal,missing,none,none,未实现
+JT/T 808,JT/T 808-2019,0x8400-0x8402,电话/短信/拨号,platform-terminal,missing,none,none,未实现
+JT/T 808,JT/T 808-2019,0x8500,车辆控制,platform-terminal,partial,src/api/terminal_downlink.rs,API,需按T-Box适配
+JT/T 808,JT/T 808-2019,0x8600-0x8608,区域/路线,platform-terminal,missing,none,none,未实现
+JT/T 808,JT/T 808-2019,0x8700-0x8702,行驶记录/电子运单,platform-terminal,missing,none,none,未实现
+JT/T 808,JT/T 808-2019,0x8800-0x8805,多媒体/录音,platform-terminal,missing,none,none,未实现
+JT/T 808,JT/T 808-2019,0x8900/0x8A00/0x8F00,扩展消息,platform-terminal,missing,none,none,未实现
+JT/T 808,JT/T 808-2019,encryption,2019加密报文,terminal-platform,missing,none,none,TLS/mTLS不等同协议层加密
+JT/T 809,JT/T 809-2019,envelope,0x5B/0x5D+CRC32,platform-platform,done,src/standards/jt809.rs,unit test,加解密/压缩未实现
+JT/T 809,JT/T 809-2019,login,登录体,platform-platform,partial,src/standards/jt809.rs,unit test,无握手/校验
+JT/T 809,JT/T 809-2019,catalog,消息目录,platform-platform,missing,none,none,未实现
+JT/T 809,JT/T 809-2019,handshake,平台握手/登录/心跳,platform-platform,missing,none,none,未实现
+JT/T 809,JT/T 809-2019,business,定位/报警/平台ACK,platform-platform,missing,none,none,未实现
+JT/T 809,JT/T 809-2019,reliability,重连/重发/去重,platform-platform,missing,none,none,未实现
+GB/T 32960,GB/T 32960.3-2025,header,传输头/VIN/长度,vehicle-platform,done,src/standards/gb32960.rs,unit test + VIN charset,加密标志不处理
+GB/T 32960,GB/T 32960.3-2025,0x02,实时数据前20字节,vehicle-platform,partial,src/standards/gb32960.rs,unit test,电机/电池/极值/报警未实现
+GB/T 32960,GB/T 32960.3-2025,0x01,登录,vehicle-platform,partial,src/standards/gb32960.rs,unit test,无平台响应/会话
+GB/T 32960,GB/T 32960.3-2025,0x04,登出,vehicle-platform,missing,none,none,未实现
+GB/T 32960,GB/T 32960.3-2025,0x07,心跳,vehicle-platform,missing,none,none,未实现
+GB/T 32960,GB/T 32960.3-2025,platform_ack,平台应答,platform-vehicle,missing,none,none,未实现
+GB/T 32960,GB/T 32960.4-2025,conformance,一致性测试,test,missing,none,none,未实现
+JT/T 794,JT/T 794-2019,terminal,终端技术要求,device,not_applicable,none,none,需采购/检测
+JT/T 796,JT/T 796-2019,platform,平台技术要求,platform,partial,app features,none,监管接口/性能证据缺失
+GB/T 35658,GB/T 35658-2017,platform,平台技术要求,platform,partial,app features,none,条款逐项验收缺失
+GB/T 19056,GB/T 19056-2021,tachograph,行驶记录仪,device-platform,missing,none,none,未实现
+JT/T 1078,JT/T 1078-2016,video,视频通信,device-platform,missing,none,none,未实现
+JT/T 1077,JT/T 1077-2016,video_terminal,视频终端,device,missing,none,none,未实现
+GB/T 22239,GB/T 22239-2019,mlps,等保2.0,compliance,partial,auth/RBAC/audit/TLS,none,定级/测评/整改缺失
+GB/T 41871,GB/T 41871-2022,auto_data,汽车数据安全,compliance,partial,audit/tenant isolation,none,告知同意/匿名化/重要数据缺失
+GB/T 35273,GB/T 35273-2020,pii,个人信息,compliance,partial,audit/tenant isolation,none,生命周期/导出/删除缺失
+GB/T 39786,GB/T 39786-2021,crypto,密码应用,compliance,partial,RS256/TLS/mTLS,none,国密/密钥生命周期缺失
+Local,local,platform,地方标准,platform,missing,none,none,按运营地目录适配

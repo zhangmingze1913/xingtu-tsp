@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tsp-config
+  namespace: xingtu-tsp
+data:
+  TSP_BIND: "0.0.0.0:8090"
+  TSP_JT808_ADDR: "0.0.0.0:18080"
+  TSP_CLUSTER_MODE: "true"
+  TSP_DEMO_MODE: "true"
+  TSP_COMMAND_MODE: "simulated"
+  TSP_POSTGIS_ENABLED: "true"
+  # Set to production and disable demo/command simulation before real rollout.
+  TSP_ENV: "development"
+  TSP_CORS_ORIGINS: ""
+  TSP_JWT_ACCESS_TTL_MINUTES: "15"
+  TSP_JWT_REFRESH_TTL_HOURS: "168"
+  TSP_JWT_KEY_ID: "tsp-rs256-1"
+  # TSP_JWT_PREVIOUS_KEYS: "old-1=/etc/tsp/secret/jwt-old-1.pem"
+  TSP_REDIS_ALLOW_PLAINTEXT: "false"
+  TSP_JT808_ALLOW_PLAINTEXT: "false"
+  # TSP_JT808_CLIENT_CA: "/etc/tsp/secret/jt808-client-ca.pem"
+  # TSP_JT808_ALLOWED_CIDRS: "10.0.0.0/8,192.168.0.0/16"
+  TSP_JT808_TLS_CERT: "/etc/tsp/secret/jt808-cert.pem"
+  TSP_JT808_TLS_KEY: "/etc/tsp/secret/jt808-key.pem"
+  TSP_JWT_PRIVATE_KEY_FILE: "/etc/tsp/secret/jwt-private.pem"
+  TSP_JWT_PUBLIC_KEY_FILE: "/etc/tsp/secret/jwt-public.pem"
+  RUST_LOG: "xingtu_tsp=info,tower_http=warn"
+  # Use a managed Redis or Redis Operator in production.
+  TSP_REDIS_URL: "redis://redis:6379/0"
+  # Optional Apache Iggy HTTP event log. Set the URL and apply iggy.yaml to enable.
+  TSP_IGGY_URL: ""
+  TSP_IGGY_STREAM: "xingtu-tsp"
+  TSP_IGGY_TOPIC: "events"
+  TSP_IGGY_USERNAME: "iggy"
+  # Optional tsink time-series store (Prometheus-compatible HTTP)
+  TSP_TSINK_URL: ""
+  TSP_TSINK_TOKEN: ""
+  # Optional TDengine REST SQL (taosAdapter)
+  TSP_TDENGINE_URL: ""
+  TSP_TDENGINE_USER: "root"
+  TSP_TDENGINE_PASSWORD: "taosdata"
+  TSP_TDENGINE_DATABASE: "tsp"
+  # Optional Walrus durable event archive (length-prefixed TCP)
+  TSP_WALRUS_ADDR: ""
+  TSP_WALRUS_TOPIC: "tsp-events"
+  # OpenRaft control plane (leave node id unset; derive unique id from TSP_NODE_ID)
+  TSP_RAFT_ENABLED: "false"
+  TSP_RAFT_ADDR: "0.0.0.0:7001"
+  TSP_RAFT_PEERS: ""
+  TSP_RAFT_BOOTSTRAP: "true"

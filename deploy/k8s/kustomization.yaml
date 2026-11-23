@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: xingtu-tsp
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - postgres.yaml
+  - redis.yaml
+  - api.yaml
+  - gateway.yaml
+  - ingress.yaml
+  - autoscaling.yaml
+  # - networkpolicy.yaml
+# secret.yaml is intentionally not listed: create it from secret.example.yaml
+# and apply it before kustomize, so credentials never live in Git.
+images:
+  - name: xingtu-tsp
+    newName: ghcr.io/your-org/xingtu-tsp
+    newTag: "0.1.0"

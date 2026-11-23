@@ -1,0 +1,7 @@
+target
+data
+shots
+tools
+docs
+*.log
+.env

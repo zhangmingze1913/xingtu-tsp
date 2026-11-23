@@ -1,0 +1,112 @@
+# Optional baseline policies. Adjust labels for your CNI/ingress controller.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: xingtu-tsp
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-ingress
+  namespace: xingtu-tsp
+spec:
+  podSelector:
+    matchLabels:
+      app: tsp-api
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8090
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-openraft
+  namespace: xingtu-tsp
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: ["tsp-api", "tsp-jt808"]
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values: ["tsp-api", "tsp-jt808"]
+      ports:
+        - protocol: TCP
+          port: 7001
+  egress:
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values: ["tsp-api", "tsp-jt808"]
+      ports:
+        - protocol: TCP
+          port: 7001
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-jt808-ingress
+  namespace: xingtu-tsp
+spec:
+  podSelector:
+    matchLabels:
+      app: tsp-jt808
+  policyTypes: ["Ingress"]
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 18080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-data-plane
+  namespace: xingtu-tsp
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: ["tsp-api", "tsp-jt808"]
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

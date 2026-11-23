@@ -1,0 +1,15 @@
+/target/
+/data/
+/shots/
+/tools/browsers/
+*.log
+.env
+deploy/k8s/secret.yaml
+
+secrets/*.pem
+
+/raft-data/
+/backups-test/
+/secrets/
+*.err
+*.out

@@ -1,0 +1,103 @@
+# Optional Apache Iggy event-stream profile.
+#
+# Apply this file, then set TSP_IGGY_URL=http://iggy:3000 on BOTH the API and
+# gateway Deployments (or patch tsp-config). Iggy replaces Redis Pub/Sub as the
+# durable domain-event log; Redis still owns leader leases and gateway sessions.
+#
+# Iggy's data directory in the official image is /local_data.
+apiVersion: v1
+kind: Service
+metadata:
+  name: iggy
+  namespace: xingtu-tsp
+  labels:
+    app: iggy
+spec:
+  selector:
+    app: iggy
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+    - name: tcp
+      port: 8090
+      targetPort: tcp
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: iggy
+  namespace: xingtu-tsp
+  labels:
+    app: iggy
+spec:
+  serviceName: iggy
+  replicas: 1
+  selector:
+    matchLabels:
+      app: iggy
+  template:
+    metadata:
+      labels:
+        app: iggy
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: iggy
+          image: apache/iggy:0.10.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+            - name: tcp
+              containerPort: 8090
+          env:
+            - name: IGGY_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: tsp-secret
+                  key: iggy-username
+            - name: IGGY_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tsp-secret
+                  key: iggy-password
+            - name: IGGY_HTTP_ENABLED
+              value: "true"
+            - name: IGGY_HTTP_ADDRESS
+              value: "0.0.0.0:3000"
+            - name: IGGY_TCP_ADDRESS
+              value: "0.0.0.0:8090"
+            - name: IGGY_SYSTEM_PATH
+              value: /local_data
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          volumeMounts:
+            - name: data
+              mountPath: /local_data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 20Gi

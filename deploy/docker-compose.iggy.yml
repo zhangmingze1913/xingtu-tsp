@@ -1,0 +1,74 @@
+# Iggy override for the local cluster:
+#   docker compose -f deploy/docker-compose.cluster.yml -f deploy/docker-compose.iggy.yml up --build
+#
+# Redis remains the coordination backend (leader/session), Iggy becomes the
+# durable event log consumed by every API/gateway node.
+services:
+  iggy:
+    image: apache/iggy:0.10.0
+    environment:
+      IGGY_ROOT_USERNAME: iggy
+      IGGY_ROOT_PASSWORD: iggy
+      IGGY_HTTP_ENABLED: "true"
+      IGGY_HTTP_ADDRESS: 0.0.0.0:3000
+      IGGY_TCP_ADDRESS: 0.0.0.0:8090
+      IGGY_SYSTEM_PATH: /local_data
+    ports:
+      - "3000:3000"
+    volumes:
+      - iggydata:/local_data
+
+  api-a:
+    environment:
+      TSP_IGGY_URL: http://iggy:3000
+      TSP_IGGY_USERNAME: iggy
+      TSP_IGGY_PASSWORD: iggy
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      iggy:
+        condition: service_started
+
+  api-b:
+    environment:
+      TSP_IGGY_URL: http://iggy:3000
+      TSP_IGGY_USERNAME: iggy
+      TSP_IGGY_PASSWORD: iggy
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      iggy:
+        condition: service_started
+
+  gateway-a:
+    environment:
+      TSP_IGGY_URL: http://iggy:3000
+      TSP_IGGY_USERNAME: iggy
+      TSP_IGGY_PASSWORD: iggy
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      iggy:
+        condition: service_started
+
+  gateway-b:
+    environment:
+      TSP_IGGY_URL: http://iggy:3000
+      TSP_IGGY_USERNAME: iggy
+      TSP_IGGY_PASSWORD: iggy
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      iggy:
+        condition: service_started
+
+volumes:
+  iggydata:

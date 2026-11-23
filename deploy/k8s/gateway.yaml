@@ -1,0 +1,151 @@
+# JT/T 808 TCP gateway. Terminals connect through an L4 load balancer.
+# Each pod accepts a subset of long-lived TCP connections; session ownership
+# is advertised through Redis so the command dispatcher can route downlinks.
+apiVersion: v1
+kind: Service
+metadata:
+  name: tsp-jt808
+  namespace: xingtu-tsp
+  labels:
+    app: tsp-jt808
+  annotations:
+    # Cloud provider examples: use an NLB/CLB annotation appropriate for your cloud.
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+spec:
+  type: LoadBalancer
+  selector:
+    app: tsp-jt808
+  ports:
+    - name: jt808
+      port: 18080
+      targetPort: jt808
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tsp-jt808
+  namespace: xingtu-tsp
+  labels:
+    app: tsp-jt808
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: tsp-jt808
+  template:
+    metadata:
+      labels:
+        app: tsp-jt808
+    spec:
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: tsp-jt808
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: tsp-jt808
+      containers:
+        - name: gateway
+          image: xingtu-tsp:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: jt808
+              containerPort: 18080
+            - name: http
+              containerPort: 8090
+            - name: raft
+              containerPort: 7001
+          envFrom:
+            - configMapRef:
+                name: tsp-config
+          env:
+            - name: TSP_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: tsp-secret
+                  key: database-url
+            - name: TSP_JWT_PRIVATE_KEY_FILE
+              value: /etc/tsp/secret/jwt-private.pem
+            - name: TSP_JWT_PUBLIC_KEY_FILE
+              value: /etc/tsp/secret/jwt-public.pem
+            - name: TSP_IGGY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tsp-secret
+                  key: iggy-password
+                  optional: true
+            - name: TSP_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: TSP_NODE_ROLE
+              value: gateway
+            - name: TSP_DEMO_MODE
+              value: "false"
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            failureThreshold: 4
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: tsp-secret
+              mountPath: /etc/tsp/secret
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: tsp-secret
+          secret:
+            secretName: tsp-secret
+            items:
+              - key: jwt-private.pem
+                path: jwt-private.pem
+              - key: jwt-public.pem
+                path: jwt-public.pem
+              - key: jt808-cert.pem
+                path: jt808-cert.pem
+              - key: jt808-key.pem
+                path: jt808-key.pem

@@ -1,0 +1,51 @@
+[
+  {
+    "scale": "10K",
+    "org": "bench-10K",
+    "concurrency": 20,
+    "requests_per_endpoint": 100,
+    "login_ms": 682.6,
+    "dashboard_cold_ms": 211.6,
+    "dashboard_cold_error": null,
+    "dashboard_warm": {
+      "avg": 9.8,
+      "p50": 8.9,
+      "p95": 17.4
+    },
+    "vehicles_list_seq": {
+      "p50": 22.8,
+      "p95": 32.8
+    },
+    "vehicles_list_burst": {
+      "avg": 176.8,
+      "p50": 185.9,
+      "p95": 228.3,
+      "p99": 241.7,
+      "errors": 0,
+      "rps": 100.72
+    },
+    "map_seq": {
+      "p50": 38.9,
+      "p95": 43.9
+    },
+    "map_burst": {
+      "avg": 476.0,
+      "p50": 498.3,
+      "p95": 697.2,
+      "errors": 0,
+      "rps": 39.1
+    },
+    "bbox_seq": {
+      "p50": 127.3
+    },
+    "nearby_seq": {
+      "p50": 139.8
+    },
+    "telemetry": {
+      "p50": 87.1,
+      "p95": 121.5,
+      "errors": 0,
+      "rps": 94.97
+    }
+  }
+]

@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#060b14">
+  <title>星途车联 · TSP 智能运营平台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b1625'/%3E%3Cpath d='M14 40c8-2 12-8 18-14s12-6 18-4' stroke='%232dd4bf' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='46' cy='22' r='6' fill='%232dd4bf'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<svg class="svg-sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
+  <symbol id="i-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v4M21 12h-4M12 21v-4M3 12h4"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-car" viewBox="0 0 24 24"><path d="M5 16h14M4 16l1.6-5.2A3 3 0 0 1 8.5 9h7a3 3 0 0 1 2.9 1.8L20 16v3a1 1 0 0 1-1 1h-1a2 2 0 0 0-4 0H9a2 2 0 0 0-4 0H4a1 1 0 0 1-1-1v-3z"/><path d="M7 13h.01M17 13h.01"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="3"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/><rect x="10" y="10" width="4" height="4" rx="1"/></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H12a4 4 0 0 0 4-4V9a4 4 0 0 1 4-4h.5M6 16.5V8a3 3 0 0 1 3-3h3"/></symbol>
+  <symbol id="i-fence" viewBox="0 0 24 24"><path d="M12 3 21 8v8l-9 5-9-5V8l9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></symbol>
+  <symbol id="i-command" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="4"/><path d="m8 9 3 3-3 3M13 15h3"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5"/><path d="M18.4 9A7 7 0 0 0 6.2 6.2L4 11M5.6 15A7 7 0 0 0 17.8 17.8L20 13"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M14 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-3"/><path d="M9 12h12M18 9l3 3-3 3"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="i-battery" viewBox="0 0 24 24"><rect x="2" y="7" width="17" height="10" rx="3"/><path d="M22 10v4M6 10h7"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 15v2"/></symbol>
+  <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 7.5-2M12 15v2"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M7 6.2a8 8 0 1 0 10 0"/></symbol>
+  <symbol id="i-snow" viewBox="0 0 24 24"><path d="M12 2v20M4 7l16 10M20 7 4 17M8 4l4 4 4-4M8 20l4-4 4 4M3 10l5 2-2 5M21 10l-5 2 2 5"/></symbol>
+  <symbol id="i-horn" viewBox="0 0 24 24"><path d="M4 10v4h4l7 5V5L8 10H4z"/><path d="M18 8a6 6 0 0 1 0 8M21 5a10 10 0 0 1 0 14"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></symbol>
+  <symbol id="i-window" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16M3 12h18"/></symbol>
+  <symbol id="i-locate" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6l-8-3z"/><path d="m8.5 12 2.4 2.4 4.6-5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5M12 17h.01"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></symbol>
+  <symbol id="i-trip" viewBox="0 0 24 24"><path d="M4 19V5h7l2 3h7v11H4z"/><path d="M8 15h8"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4.5 19a9 9 0 1 1 15 0"/><path d="m12 13 4-4"/><circle cx="12" cy="13" r="1.5"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 11-8 11S4 16 4 10a8 8 0 1 1 16 0z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0"/><circle cx="12" cy="19" r="1" fill="currentColor"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4 2v-8L3 5z"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.2-1.2"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></symbol>
+</svg>
+
+<div id="loginView" class="login-screen">
+  <div class="login-visual">
+    <div class="login-visual-grid"></div>
+    <div class="login-orbit orbit-a"></div>
+    <div class="login-orbit orbit-b"></div>
+    <svg class="login-map" viewBox="0 0 760 780" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs>
+        <linearGradient id="loginRiver" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#2dd4bf" stop-opacity=".55"/>
+          <stop offset="1" stop-color="#3b82f6" stop-opacity=".12"/>
+        </linearGradient>
+        <radialGradient id="loginGlow">
+          <stop offset="0" stop-color="#2dd4bf" stop-opacity=".35"/>
+          <stop offset="1" stop-color="#2dd4bf" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <path class="lmap-land" d="M95 480 125 365 205 270 320 210 445 225 560 285 660 370 680 480 635 590 540 660 430 700 315 672 205 610 130 550Z"/>
+      <path class="lmap-island" d="M300 115 400 80 520 95 610 140 570 185 460 195 355 178 295 148Z"/>
+      <path class="lmap-river" d="M350 280c28 55 62 74 42 125s-68 65-38 118 86 54 68 112" stroke="url(#loginRiver)"/>
+      <path class="lmap-road" d="M170 520 285 430 400 390 540 405 650 350"/>
+      <path class="lmap-road" d="M210 600 330 540 450 545 570 610"/>
+      <path class="lmap-road thin" d="M260 310 380 330 500 305 620 345"/>
+      <path class="lmap-road thin" d="M300 650 350 500 390 360"/>
+      <circle cx="505" cy="380" r="160" fill="url(#loginGlow)"/>
+      <g class="lmap-node"><circle cx="505" cy="380" r="5"/><circle class="ring" cx="505" cy="380" r="19"/></g>
+      <g class="lmap-node minor"><circle cx="330" cy="500" r="4"/><circle class="ring" cx="330" cy="500" r="14"/></g>
+      <g class="lmap-node minor"><circle cx="580" cy="540" r="4"/><circle class="ring" cx="580" cy="540" r="14"/></g>
+      <g class="lmap-node minor"><circle cx="255" cy="280" r="4"/><circle class="ring" cx="255" cy="280" r="14"/></g>
+      <g class="lmap-label"><text x="522" y="372">上海</text><text x="345" y="492">虹桥</text><text x="595" y="555">浦东</text></g>
+      <g class="lmap-route"><path d="M255 280 Q 360 300 505 380 T 580 540"/></g>
+    </svg>
+    <div class="login-brand">
+      <div class="brand-mark large"><span></span><span></span><span></span></div>
+      <span>星途车联 <em>XINGTU</em></span>
+    </div>
+    <div class="login-copy">
+      <div class="eyebrow"><span class="eyebrow-dot"></span>CONNECTED VEHICLE CLOUD</div>
+      <h1>让每一辆车<br><span>都清晰可见。</span></h1>
+      <p>连接车辆、终端与业务，构建从实时感知、风险预警到远程控制的完整车联网运营闭环。</p>
+      <div class="login-metrics">
+        <div><strong>18</strong><span>接入车辆</span></div>
+        <div><strong>99.98%</strong><span>平台可用性</span></div>
+        <div><strong>24×7</strong><span>安全守护</span></div>
+      </div>
+    </div>
+    <div class="login-foot">JT/T 808 · MQTT · HTTPS · WebSocket <span>端到端安全接入</span></div>
+  </div>
+
+  <div class="login-panel">
+    <div class="login-box">
+      <div class="login-mobile-brand">
+        <div class="brand-mark"><span></span><span></span><span></span></div>
+        <span>星途车联</span>
+      </div>
+      <span class="login-kicker">TSP OPERATIONS CONSOLE</span>
+      <h2>登录运营平台</h2>
+      <p class="login-sub">使用企业账号进入车联网智能运营中心</p>
+      <form id="loginForm" class="login-form" autocomplete="on">
+        <label class="field">
+          <span>账号</span>
+          <div class="input-shell">
+            <svg class="icon"><use href="#i-user"></use></svg>
+            <input id="username" name="username" type="text" placeholder="请输入账号" autocomplete="username" required>
+          </div>
+        </label>
+        <label class="field">
+          <span>密码</span>
+          <div class="input-shell">
+            <svg class="icon"><use href="#i-lock"></use></svg>
+            <input id="password" name="password" type="password" placeholder="请输入密码" autocomplete="current-password" required>
+            <button type="button" id="togglePassword" class="input-action" aria-label="显示密码">显示</button>
+          </div>
+        </label>
+        <div class="login-options">
+          <label class="checkbox"><input type="checkbox" id="rememberMe" checked><span></span>记住登录状态</label>
+          <span class="login-help">遇到问题？联系平台管理员</span>
+        </div>
+        <div id="loginError" class="login-error hidden"></div>
+        <button type="submit" class="btn btn-primary btn-block" id="loginBtn">
+          <span>进入控制台</span><svg class="icon"><use href="#i-chevron"></use></svg>
+        </button>
+      </form>
+      <div class="demo-access">
+        <div class="demo-access-title"><span>演示账号</span><i></i></div>
+        <div class="demo-chips">
+          <button type="button" class="demo-chip" data-demo="admin"><strong>管理员</strong><span>admin / admin123</span></button>
+          <button type="button" class="demo-chip" data-demo="operator"><strong>运营</strong><span>operator / operator123</span></button>
+          <button type="button" class="demo-chip" data-demo="viewer"><strong>只读</strong><span>viewer / viewer123</span></button>
+        </div>
+      </div>
+      <div class="login-legal">登录即表示您同意平台安全与数据使用规范 · v1.0.0</div>
+    </div>
+  </div>
+</div>
+
+<div id="appView" class="app hidden">
+  <div id="sidebarOverlay" class="sidebar-overlay"></div>
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark"><span></span><span></span><span></span></div>
+      <div><strong>星途车联</strong><span>TSP CLOUD</span></div>
+    </div>
+    <nav class="nav">
+      <div class="nav-label">运营中心</div>
+      <button class="nav-item active" data-view="dashboard"><svg class="icon"><use href="#i-grid"></use></svg><span>运营总览</span></button>
+      <button class="nav-item" data-view="live"><svg class="icon"><use href="#i-radar"></use></svg><span>实时监控</span><i class="live-dot"></i></button>
+      <div class="nav-label">车队资产</div>
+      <button class="nav-item" data-view="vehicles"><svg class="icon"><use href="#i-car"></use></svg><span>车辆管理</span><b id="navVehicleCount">18</b></button>
+      <button class="nav-item" data-view="terminals"><svg class="icon"><use href="#i-chip"></use></svg><span>终端管理</span></button>
+      <div class="nav-label">业务运营</div>
+      <button class="nav-item" data-view="trips"><svg class="icon"><use href="#i-route"></use></svg><span>行程分析</span></button>
+      <button class="nav-item" data-view="geofences"><svg class="icon"><use href="#i-fence"></use></svg><span>电子围栏</span></button>
+      <button class="nav-item" data-view="alerts"><svg class="icon"><use href="#i-bell"></use></svg><span>告警中心</span><b id="navAlertCount" class="danger hidden">0</b></button>
+      <button class="nav-item" data-view="commands"><svg class="icon"><use href="#i-command"></use></svg><span>指令中心</span></button>
+      <button class="nav-item" data-view="media"><svg class="icon"><use href="#i-radar"></use></svg><span>媒体播放</span></button>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="system-card">
+        <div class="system-card-top"><span>平台运行状态</span><i class="status-dot ok"></i></div>
+        <div class="system-row"><span>TSP 核心服务</span><b>正常</b></div>
+        <div class="system-row"><span>JT/T 808 网关</span><b id="gatewayState">监听中</b></div>
+        <div class="system-row"><span>实时数据通道</span><b id="wsState">连接中</b></div>
+        <div class="system-row"><span>集群协调</span><b id="clusterState">单机模式</b></div>
+        <div class="system-meter"><i></i></div>
+      </div>
+      <button class="sidebar-user" id="sidebarUser">
+        <span class="avatar" id="sideAvatar">张</span>
+        <span class="sidebar-user-info"><strong id="sideName">张伟</strong><em id="sideRole">平台管理员</em></span>
+        <svg class="icon"><use href="#i-more"></use></svg>
+      </button>
+    </div>
+  </aside>
+
+  <div class="workspace">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="icon-btn mobile-menu" id="menuBtn" aria-label="打开菜单"><svg class="icon"><use href="#i-menu"></use></svg></button>
+        <div class="page-ident">
+          <div class="crumb"><span>星途 TSP</span><i>/</i><b id="crumbCurrent">运营总览</b></div>
+          <h1 id="pageTitle">运营总览</h1>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="global-search">
+          <svg class="icon"><use href="#i-search"></use></svg>
+          <input id="globalSearch" type="search" placeholder="搜索车牌 / VIN / 驾驶员" aria-label="全局搜索">
+          <kbd>↵</kbd>
+        </div>
+        <div class="live-status" id="liveStatus"><i></i><span>实时连接</span></div>
+        <div class="clock"><strong id="clockTime">20:00:00</strong><span id="clockDate">11月15日 周日</span></div>
+        <div class="user-menu-wrap">
+          <button class="topbar-user" id="userMenuBtn">
+            <span class="avatar" id="topAvatar">张</span>
+            <span><strong id="topName">张伟</strong><em id="topRole">平台管理员</em></span>
+            <svg class="icon"><use href="#i-down"></use></svg>
+          </button>
+          <div class="user-menu hidden" id="userMenu">
+            <div class="user-menu-head"><span class="avatar" id="menuAvatar">张</span><div><strong id="menuName">张伟</strong><span id="menuUsername">admin</span></div></div>
+            <button id="logoutBtn"><svg class="icon"><use href="#i-logout"></use></svg>退出登录</button>
+          </div>
+        </div>
+      </div>
+    </header>
+    <main id="view" class="view"></main>
+  </div>
+</div>
+
+<div id="modalRoot" class="modal-root"></div>
+<div id="toastRoot" class="toast-root"></div>
+<div id="connectionBanner" class="connection-banner hidden"><i></i><span>实时通道中断，正在自动重连…</span></div>
+<script src="./app.js" defer></script>
+</body>
+</html>

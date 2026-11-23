@@ -1,0 +1,132 @@
+# Optional production shape for OpenRaft.
+#
+# The default `api.yaml` Deployment is for demo/Redis-leader mode. A static
+# Raft membership needs stable pod identity, so use this StatefulSet when
+# TSP_RAFT_ENABLED=true. Do not attach an HPA to this workload: scaling a
+# static Raft membership requires a membership-change workflow first.
+apiVersion: v1
+kind: Service
+metadata:
+  name: tsp-api-headless
+  namespace: xingtu-tsp
+  labels:
+    app: tsp-api
+spec:
+  clusterIP: None
+  selector:
+    app: tsp-api
+  ports:
+    - name: http
+      port: 8090
+      targetPort: http
+    - name: raft
+      port: 7001
+      targetPort: raft
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: tsp-api
+  namespace: xingtu-tsp
+spec:
+  serviceName: tsp-api-headless
+  replicas: 3
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: tsp-api
+  template:
+    metadata:
+      labels:
+        app: tsp-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8090"
+        prometheus.io/path: "/api/metrics"
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: api
+          image: xingtu-tsp:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8090
+            - name: raft
+              containerPort: 7001
+          envFrom:
+            - configMapRef:
+                name: tsp-config
+          env:
+            - name: TSP_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: tsp-secret
+                  key: database-url
+            - name: TSP_JWT_PRIVATE_KEY_FILE
+              value: /etc/tsp/secret/jwt-private.pem
+            - name: TSP_JWT_PUBLIC_KEY_FILE
+              value: /etc/tsp/secret/jwt-public.pem
+            - name: TSP_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: TSP_RAFT_NODE_ROLE
+              value: api
+            - name: TSP_RAFT_DATA_DIR
+              value: /var/lib/xingtu/raft
+            # Static peers use the stable StatefulSet DNS names. The app
+            # derives a unique Raft node id from TSP_NODE_ID when no explicit
+            # TSP_RAFT_NODE_ID is set.
+            - name: TSP_RAFT_PEERS
+              value: "tsp-api-0.tsp-api-headless:7001,tsp-api-1.tsp-api-headless:7001,tsp-api-2.tsp-api-headless:7001"
+          volumeMounts:
+            - name: raft-data
+              mountPath: /var/lib/xingtu/raft
+            - name: tsp-secret
+              mountPath: /etc/tsp/secret
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: tsp-secret
+          secret:
+            secretName: tsp-secret
+            items:
+              - key: jwt-private.pem
+                path: jwt-private.pem
+              - key: jwt-public.pem
+                path: jwt-public.pem
+              - key: jt808-cert.pem
+                path: jt808-cert.pem
+              - key: jt808-key.pem
+                path: jt808-key.pem
+  volumeClaimTemplates:
+    - metadata:
+        name: raft-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi

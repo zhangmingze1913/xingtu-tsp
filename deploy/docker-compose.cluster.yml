@@ -1,0 +1,102 @@
+# Local cluster smoke test: 2 API instances, 2 JT808 gateways, PostgreSQL, Redis, Nginx.
+# Production should use Kubernetes or a managed container platform.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: tsp
+      POSTGRES_USER: tsp
+      POSTGRES_PASSWORD: tsp-dev-password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tsp -d tsp"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api-a:
+    build: ..
+    image: xingtu-tsp:0.1.0
+    environment: &api-env
+      TSP_BIND: 0.0.0.0:8090
+      TSP_JT808_ADDR: 0.0.0.0:18080
+      TSP_DATABASE: postgres://tsp:tsp-dev-password@postgres:5432/tsp?sslmode=disable
+      TSP_REDIS_URL: redis://redis:6379/0
+      TSP_CLUSTER_MODE: "true"
+      TSP_DEMO_MODE: "true"
+      TSP_JWT_SECRET: local-cluster-secret-change-me
+      TSP_NODE_ID: api-a
+      TSP_NODE_ROLE: api
+      RUST_LOG: xingtu_tsp=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  api-b:
+    build: ..
+    image: xingtu-tsp:0.1.0
+    environment:
+      <<: *api-env
+      TSP_NODE_ID: api-b
+    depends_on:
+      - api-a
+      - postgres
+      - redis
+
+  gateway-a:
+    build: ..
+    image: xingtu-tsp:0.1.0
+    environment:
+      <<: *api-env
+      TSP_DEMO_MODE: "false"
+      TSP_NODE_ID: gateway-a
+      TSP_NODE_ROLE: gateway
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  gateway-b:
+    build: ..
+    image: xingtu-tsp:0.1.0
+    environment:
+      <<: *api-env
+      TSP_DEMO_MODE: "false"
+      TSP_NODE_ID: gateway-b
+      TSP_NODE_ROLE: gateway
+    depends_on:
+      - gateway-a
+      - postgres
+      - redis
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8090:80"
+      - "18080:18080"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api-a
+      - api-b
+      - gateway-a
+      - gateway-b
+
+volumes:
+  pgdata:
+  redisdata:

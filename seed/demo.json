@@ -1,0 +1,58 @@
+{
+  "vehicles": [
+    {"plate":"沪A·D8F21","model":"ID.4 CROZZ","energy":"EV","color":"冰川白","driver":"张伟","phone":"138****2101","org":"星途出行 · 浦东车队","lat":31.2397,"lon":121.4998,"status":"moving","soc":78.0,"odometer":12450.0},
+    {"plate":"沪A·D9K36","model":"Model Y","energy":"EV","color":"珍珠白","driver":"李敏","phone":"139****3312","org":"星途出行 · 浦东车队","lat":31.2015,"lon":121.5990,"status":"moving","soc":64.0,"odometer":28760.0},
+    {"plate":"沪B·F72Q8","model":"汉 EV","energy":"EV","color":"玄空黑","driver":"王磊","phone":"136****8820","org":"星途出行 · 虹桥车队","lat":31.1970,"lon":121.3260,"status":"moving","soc":82.0,"odometer":19320.0},
+    {"plate":"沪A·D3M19","model":"领克 08 EM-P","energy":"PHEV","color":"拂晓蓝","driver":"陈晓","phone":"137****5518","org":"星途出行 · 虹桥车队","lat":31.1880,"lon":121.4370,"status":"moving","soc":55.0,"odometer":36210.0},
+    {"plate":"苏E·D6P52","model":"理想 L7","energy":"PHEV","color":"银灰","driver":"刘洋","phone":"158****9031","org":"星途出行 · 城际车队","lat":31.2290,"lon":121.4540,"status":"moving","soc":12.0,"odometer":47880.0},
+    {"plate":"浙A·D8T77","model":"小鹏 G6","energy":"EV","color":"星云白","driver":"赵静","phone":"135****2276","org":"星途出行 · 城际车队","lat":31.2720,"lon":121.5200,"status":"moving","soc":69.0,"odometer":8900.0},
+    {"plate":"沪A·D5N08","model":"蔚来 ES6","energy":"EV","color":"同温层蓝","driver":"周凯","phone":"186****7412","org":"星途出行 · 浦东车队","lat":31.3750,"lon":121.2500,"status":"moving","soc":88.0,"odometer":15680.0},
+    {"plate":"沪B·F19X2","model":"极氪 001","energy":"EV","color":"极昼白","driver":"孙悦","phone":"150****6629","org":"星途出行 · 虹桥车队","lat":31.0320,"lon":121.2270,"status":"moving","soc":47.0,"odometer":24560.0},
+    {"plate":"沪A·D7R63","model":"问界 M7","energy":"PHEV","color":"鎏金黑","driver":"吴昊","phone":"189****1108","org":"星途出行 · 城际车队","lat":31.1500,"lon":121.1150,"status":"moving","soc":36.0,"odometer":31240.0},
+    {"plate":"沪A·D2H45","model":"埃安 S MAX","energy":"EV","color":"幻影银","driver":"郑洁","phone":"133****4190","org":"星途出行 · 虹桥车队","lat":31.1120,"lon":121.3810,"status":"idle","soc":90.0,"odometer":52300.0},
+    {"plate":"沪B·F63L9","model":"五菱缤果","energy":"EV","color":"奶咖白","driver":"冯磊","phone":"177****3055","org":"星途出行 · 浦东车队","lat":31.2490,"lon":121.3950,"status":"idle","soc":66.0,"odometer":7180.0},
+    {"plate":"沪A·D1C87","model":"宝马 i3","energy":"EV","color":"矿石灰","driver":"褚宁","phone":"180****8266","org":"星途出行 · 虹桥车队","lat":31.2310,"lon":121.4840,"status":"charging","soc":42.0,"odometer":27890.0},
+    {"plate":"苏E·F28K1","model":"奥迪 Q4 e-tron","energy":"EV","color":"量子灰","driver":"卫东","phone":"159****5744","org":"星途出行 · 城际车队","lat":31.4050,"lon":121.4850,"status":"offline","soc":33.0,"odometer":41230.0},
+    {"plate":"浙A·F91M6","model":"大众帕萨特 PHEV","energy":"PHEV","color":"曜石黑","driver":"蒋雯","phone":"188****1932","org":"星途出行 · 城际车队","lat":30.9180,"lon":121.4740,"status":"offline","soc":19.0,"odometer":68900.0},
+    {"plate":"沪A·D6B30","model":"比亚迪宋 PLUS","energy":"PHEV","color":"苍烟色","driver":"沈鹏","phone":"131****4407","org":"星途出行 · 浦东车队","lat":31.1440,"lon":121.8080,"status":"offline","soc":57.0,"odometer":33460.0},
+    {"plate":"沪B·F55N4","model":"深蓝 SL03","energy":"EV","color":"星矿黑","driver":"韩雪","phone":"151****0288","org":"星途出行 · 虹桥车队","lat":30.7420,"lon":121.3420,"status":"maintenance","soc":61.0,"odometer":18770.0},
+    {"plate":"沪A·D4S72","model":"smart #1","energy":"EV","color":"粒子白","driver":"杨帆","phone":"182****7163","org":"星途出行 · 浦东车队","lat":31.6260,"lon":121.3970,"status":"moving","soc":71.0,"odometer":9650.0},
+    {"plate":"沪A·D0V18","model":"岚图 FREE","energy":"EV","color":"云清蓝","driver":"朱琳","phone":"139****8640","org":"星途出行 · 城际车队","lat":30.9000,"lon":121.8800,"status":"moving","soc":58.0,"odometer":21640.0}
+  ],
+  "geofences": [
+    {"id":"geo_zhangjiang","name":"张江科学城","kind":"circle","center_lat":31.2050,"center_lon":121.5990,"radius_m":2600.0,"polygon":null,"color":"#22d3ee","active":true},
+    {"id":"geo_hongqiao","name":"虹桥交通枢纽","kind":"circle","center_lat":31.1970,"center_lon":121.3260,"radius_m":1800.0,"polygon":null,"color":"#f59e0b","active":true},
+    {"id":"geo_lingang","name":"临港新片区","kind":"polygon","center_lat":30.9200,"center_lon":121.9000,"radius_m":0.0,"polygon":[[121.82,30.86],[121.98,30.86],[122.0,30.96],[121.86,30.99],[121.8,30.93]],"color":"#8b5cf6","active":true},
+    {"id":"geo_ring","name":"外环限行区","kind":"polygon","center_lat":31.23,"center_lon":121.47,"radius_m":0.0,"polygon":[[121.33,31.29],[121.48,31.34],[121.63,31.28],[121.66,31.19],[121.56,31.11],[121.4,31.12],[121.31,31.2]],"color":"#fb7185","active":true},
+    {"id":"geo_airport","name":"浦东机场禁停区","kind":"circle","center_lat":31.1440,"center_lon":121.8080,"radius_m":1200.0,"polygon":null,"color":"#ef4444","active":true}
+  ],
+  "alerts": [
+    {"vehicle_index":4,"alert_type":"low_soc","level":"critical","title":"动力电池电量过低","message":"车辆 苏E·D6P52 剩余电量 12%，续航不足 60 km，请立即规划补能","minutes_ago":12,"acknowledged":false,"ack_by":null},
+    {"vehicle_index":7,"alert_type":"collision","level":"critical","title":"碰撞告警","message":"车辆 沪B·F19X2 安全气囊信号触发，请立即联系驾驶员确认现场情况","minutes_ago":45,"acknowledged":false,"ack_by":null},
+    {"vehicle_index":2,"alert_type":"overspeed","level":"critical","title":"严重超速告警","message":"车辆 沪B·F72Q8 在延安高架行驶速度 148 km/h，持续 26 秒","minutes_ago":38,"acknowledged":false,"ack_by":null},
+    {"vehicle_index":0,"alert_type":"geofence_enter","level":"info","title":"进入电子围栏","message":"车辆 沪A·D8F21 进入「张江科学城」运营围栏","minutes_ago":75,"acknowledged":false,"ack_by":null},
+    {"vehicle_index":12,"alert_type":"device_offline","level":"warning","title":"终端离线","message":"车辆 苏E·F28K1 的 T-Box 已超过 90 分钟未上报位置","minutes_ago":120,"acknowledged":false,"ack_by":null},
+    {"vehicle_index":15,"alert_type":"tire_pressure","level":"warning","title":"胎压异常","message":"车辆 沪B·F55N4 右后轮胎压 1.8 bar，低于标准值","minutes_ago":160,"acknowledged":false,"ack_by":null},
+    {"vehicle_index":5,"alert_type":"harsh_brake","level":"warning","title":"急减速告警","message":"车辆 浙A·D8T77 在 4.2 秒内减速 38 km/h，疑似急刹","minutes_ago":180,"acknowledged":true,"ack_by":"李敏"},
+    {"vehicle_index":9,"alert_type":"low_soc","level":"warning","title":"低电量预警","message":"车辆 沪A·D2H45 剩余电量 18%，建议在 30 km 内补能","minutes_ago":300,"acknowledged":true,"ack_by":"张伟"},
+    {"vehicle_index":11,"alert_type":"charge_complete","level":"info","title":"充电完成","message":"车辆 沪A·D1C87 已完成充电，当前电量 100%","minutes_ago":420,"acknowledged":true,"ack_by":"李敏"},
+    {"vehicle_index":3,"alert_type":"geofence_exit","level":"info","title":"驶出电子围栏","message":"车辆 沪A·D3M19 驶出「外环限行区」","minutes_ago":520,"acknowledged":true,"ack_by":"王磊"},
+    {"vehicle_index":1,"alert_type":"overspeed","level":"warning","title":"超速告警","message":"车辆 沪A·D9K36 在沪芦高速车速 132 km/h，已提醒驾驶员","minutes_ago":1500,"acknowledged":true,"ack_by":"李敏"},
+    {"vehicle_index":6,"alert_type":"low_soc","level":"warning","title":"低电量预警","message":"车辆 沪A·D5N08 剩余电量 16%，已推荐附近充电站","minutes_ago":2900,"acknowledged":true,"ack_by":"张伟"},
+    {"vehicle_index":8,"alert_type":"geofence_enter","level":"info","title":"进入电子围栏","message":"车辆 沪A·D7R63 进入「虹桥交通枢纽」运营围栏","minutes_ago":4300,"acknowledged":true,"ack_by":"王磊"},
+    {"vehicle_index":12,"alert_type":"device_offline","level":"warning","title":"终端离线","message":"车辆 苏E·F28K1 终端离线 32 分钟后恢复","minutes_ago":5800,"acknowledged":true,"ack_by":"李敏"},
+    {"vehicle_index":10,"alert_type":"harsh_brake","level":"warning","title":"急减速告警","message":"车辆 沪B·F63L9 在城市快速路急减速 26 km/h","minutes_ago":7200,"acknowledged":true,"ack_by":"张伟"}
+  ],
+  "commands": [
+    {"vehicle_index":1,"command":"lock","status":"success","result":"车辆已成功上锁","minutes_ago":18,"requested_by":"admin"},
+    {"vehicle_index":3,"command":"ac_on","status":"success","result":"空调已开启，目标温度 24°C","minutes_ago":42,"requested_by":"operator"},
+    {"vehicle_index":5,"command":"flash","status":"success","result":"车辆灯光已闪烁","minutes_ago":75,"requested_by":"admin"},
+    {"vehicle_index":7,"command":"start","status":"success","result":"远程启动成功，空调将按预设开启","minutes_ago":110,"requested_by":"operator"},
+    {"vehicle_index":9,"command":"charge_start","status":"success","result":"充电已启动，当前功率 60 kW","minutes_ago":160,"requested_by":"admin"},
+    {"vehicle_index":11,"command":"unlock","status":"success","result":"车辆已成功解锁","minutes_ago":220,"requested_by":"operator"},
+    {"vehicle_index":0,"command":"find","status":"success","result":"车辆已鸣笛并闪灯","minutes_ago":300,"requested_by":"admin"},
+    {"vehicle_index":2,"command":"window_close","status":"success","result":"全部车窗已关闭","minutes_ago":380,"requested_by":"operator"},
+    {"vehicle_index":6,"command":"start","status":"failed","result":"T-Box 响应超时，指令未执行","minutes_ago":430,"requested_by":"admin"},
+    {"vehicle_index":8,"command":"charge_start","status":"failed","result":"充电桩握手失败，请稍后重试","minutes_ago":510,"requested_by":"operator"}
+  ]
+}

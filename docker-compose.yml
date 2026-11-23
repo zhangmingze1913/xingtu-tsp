@@ -1,0 +1,21 @@
+services:
+  tsp:
+    build: .
+    image: xingtu-tsp:0.1.0
+    container_name: xingtu-tsp
+    ports:
+      - "8090:8090"       # HTTP console + REST + WebSocket
+      - "18080:18080"     # JT/T 808 TCP gateway
+    environment:
+      TSP_BIND: 0.0.0.0:8090
+      TSP_JT808_ADDR: 0.0.0.0:18080
+      TSP_DATABASE: /data/tsp.db
+      TSP_JWT_SECRET: change-me-in-production
+      TSP_DEMO_MODE: "true"
+      RUST_LOG: xingtu_tsp=info
+    volumes:
+      - tsp-data:/data
+    restart: unless-stopped
+
+volumes:
+  tsp-data:
