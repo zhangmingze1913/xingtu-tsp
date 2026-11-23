@@ -6,6 +6,7 @@ resources:
   - configmap.yaml
   - postgres.yaml
   - redis.yaml
+  - rustfs.yaml
   - api.yaml
   - gateway.yaml
   - ingress.yaml

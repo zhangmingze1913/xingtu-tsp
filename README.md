@@ -471,6 +471,10 @@ cargo run --release
 - Walrus 协议已从上游源码核实：命令与响应均为 4 字节小端长度前缀；上游 distributed-walrus 在 Windows 上因存储后端限制无法启动，实际运行需 Linux 环境。
 - Iggy HTTP 适配器已按 Iggy REST 契约用本地 mock 验证登录、Stream/Topic 创建、生产与消费。
 
+## Object storage
+
+RustFS is the S3-compatible object store for recorded media. See [docs/RUSTFS.md](docs/RUSTFS.md) for Compose/Kubernetes, credentials, and the MinIO migration path.
+
 ---
 
 **星途车联 XINGTU TSP** · Rust / Axum / Tokio / SQLx / SQLite + PostgreSQL + MySQL / Redis / Apache Iggy / JT/T 808 / WebSocket
