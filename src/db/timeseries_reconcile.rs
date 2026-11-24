@@ -69,7 +69,7 @@ impl Db {
             .bind(vehicle_id)
             .bind(org_name)
             .bind(consistent.map(i64::from))
-            .bind(limit.clamp(1, 200))
+            .bind(limit.clamp(1, 5000))
             .fetch_all(self.pool())
             .await?;
         Ok(rows

@@ -1,7 +1,8 @@
 use axum::{
+    body::{Body, Bytes},
     extract::{Query, State},
     http::{header, StatusCode},
-    response::{IntoResponse, Response},
+    response::Response,
     Json,
 };
 use serde::Deserialize;
@@ -190,7 +191,7 @@ pub async fn timeseries_reconciliations(
     let rows = state
         .db
         .list_timeseries_reconciliations(
-            query.limit.unwrap_or(50),
+            query.limit.unwrap_or(50).clamp(1, 200),
             query.vehicle_id.as_deref(),
             org_name.as_deref(),
             query.consistent,
@@ -243,47 +244,59 @@ pub async fn timeseries_reconciliations_export(
     let rows = state
         .db
         .list_timeseries_reconciliations(
-            query.limit.unwrap_or(200),
+            query.limit.unwrap_or(2000).clamp(1, 5000),
             query.vehicle_id.as_deref(),
             org_name.as_deref(),
             query.consistent,
         )
         .await?;
-    let csv = reconciliations_csv(&rows);
-    Ok((
-        StatusCode::OK,
-        [
-            (header::CONTENT_TYPE, "text/csv; charset=utf-8"),
-            (
-                header::CONTENT_DISPOSITION,
-                "attachment; filename=\"timeseries-reconciliations.csv\"",
-            ),
-        ],
-        csv,
-    )
-        .into_response())
+    let lines = reconciliations_csv_lines(&rows);
+    let stream = futures_util::stream::iter(
+        lines
+            .into_iter()
+            .map(|line| Ok::<Bytes, std::io::Error>(Bytes::from(line))),
+    );
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "text/csv; charset=utf-8")
+        .header(
+            header::CONTENT_DISPOSITION,
+            "attachment; filename=\"timeseries-reconciliations.csv\"",
+        )
+        .body(Body::from_stream(stream))
+        .map_err(|error| AppError::internal(format!("CSV response: {error}")))
 }
 
-fn reconciliations_csv(rows: &[crate::models::TimeseriesReconciliation]) -> String {
-    let mut out = String::from(
-        "id,vehicle_id,org_name,from_ts,to_ts,pg_count,td_count,count_delta,consistent,checked_at\n",
+fn csv_field(value: &str) -> String {
+    if value.contains([',', '"', '\n', '\r']) {
+        format!("\"{}\"", value.replace('"', "\"\""))
+    } else {
+        value.to_string()
+    }
+}
+
+fn reconciliations_csv_lines(rows: &[crate::models::TimeseriesReconciliation]) -> Vec<String> {
+    let mut lines = Vec::with_capacity(rows.len() + 1);
+    lines.push(
+        "id,vehicle_id,org_name,from_ts,to_ts,pg_count,td_count,count_delta,consistent,checked_at\n"
+            .to_string(),
     );
     for row in rows {
-        out.push_str(&format!(
+        lines.push(format!(
             "{},{},{},{},{},{},{},{},{},{}\n",
-            row.id,
-            row.vehicle_id,
-            row.org_name,
-            row.from_ts,
-            row.to_ts,
+            csv_field(&row.id),
+            csv_field(&row.vehicle_id),
+            csv_field(&row.org_name),
+            csv_field(&row.from_ts),
+            csv_field(&row.to_ts),
             row.pg_count,
             row.td_count,
             row.count_delta,
             row.consistent,
-            row.checked_at
+            csv_field(&row.checked_at)
         ));
     }
-    out
+    lines
 }
 
 #[cfg(test)]
@@ -304,7 +317,7 @@ mod tests {
             consistent: false,
             checked_at: "2026-11-24T00:00:00Z".to_string(),
         };
-        let csv = reconciliations_csv(&[row]);
+        let csv = reconciliations_csv_lines(&[row]).concat();
         assert!(csv.starts_with("id,vehicle_id"));
         assert!(csv.contains("id-1,veh-1,Org-1,a,b,10,8,2,false"));
     }
