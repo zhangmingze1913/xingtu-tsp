@@ -1,118 +1,439 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "graphTooltip": 1,
   "links": [],
   "panels": [
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
       "id": 1,
-      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "textMode": "auto" },
-      "targets": [{ "expr": "sum(increase(xingtu_tdengine_reconcile_checks_total[1h]))", "legendFormat": "checks/h", "refId": "A" }],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(xingtu_tdengine_reconcile_checks_total[1h]))",
+          "legendFormat": "checks/h",
+          "refId": "A"
+        }
+      ],
       "title": "Reconciliation checks / 1h",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] },
-      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
       "id": 2,
-      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "textMode": "auto" },
-      "targets": [{ "expr": "sum(increase(xingtu_tdengine_reconcile_mismatches_total[1h]))", "legendFormat": "mismatches/h", "refId": "A" }],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(xingtu_tdengine_reconcile_mismatches_total[1h]))",
+          "legendFormat": "mismatches/h",
+          "refId": "A"
+        }
+      ],
       "title": "Reconciliation mismatches / 1h",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
       "id": 3,
-      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "textMode": "auto" },
-      "targets": [{ "expr": "sum(xingtu_tdengine_queue_depth)", "legendFormat": "queue", "refId": "A" }],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(xingtu_tdengine_queue_depth)",
+          "legendFormat": "queue",
+          "refId": "A"
+        }
+      ],
       "title": "TDengine queue depth",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }] } }, "overrides": [] },
-      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
       "id": 4,
-      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "textMode": "auto" },
-      "targets": [{ "expr": "sum(xingtu_tdengine_spool_pending)", "legendFormat": "spool files", "refId": "A" }],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(xingtu_tdengine_spool_pending)",
+          "legendFormat": "spool files",
+          "refId": "A"
+        }
+      ],
       "title": "TDengine spool pending",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 } }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
       "id": 5,
       "targets": [
-        { "expr": "sum(rate(xingtu_tdengine_writes_total[5m]))", "legendFormat": "writes/s", "refId": "A" },
-        { "expr": "sum(rate(xingtu_tdengine_failures_total[5m]))", "legendFormat": "failures/s", "refId": "B" },
-        { "expr": "sum(rate(xingtu_tdengine_retries_total[5m]))", "legendFormat": "retries/s", "refId": "C" }
+        {
+          "expr": "sum(rate(xingtu_tdengine_writes_total[5m]))",
+          "legendFormat": "writes/s",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(xingtu_tdengine_failures_total[5m]))",
+          "legendFormat": "failures/s",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(xingtu_tdengine_retries_total[5m]))",
+          "legendFormat": "retries/s",
+          "refId": "C"
+        }
       ],
       "title": "TDengine write throughput / failures",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 } }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
       "id": 6,
       "targets": [
-        { "expr": "sum(rate(xingtu_tdengine_reconcile_checks_total[5m]))", "legendFormat": "checks/s", "refId": "A" },
-        { "expr": "sum(rate(xingtu_tdengine_reconcile_mismatches_total[5m]))", "legendFormat": "mismatches/s", "refId": "B" }
+        {
+          "expr": "sum(rate(xingtu_tdengine_reconcile_checks_total[5m]))",
+          "legendFormat": "checks/s",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(xingtu_tdengine_reconcile_mismatches_total[5m]))",
+          "legendFormat": "mismatches/s",
+          "refId": "B"
+        }
       ],
       "title": "Reconciliation checks vs mismatches",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 13 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 13
+      },
       "id": 7,
-      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "textMode": "auto" },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
       "targets": [
-        { "expr": "sum(increase(xingtu_tdengine_spooled_total[1h]))", "legendFormat": "spooled/h", "refId": "A" },
-        { "expr": "sum(increase(xingtu_tdengine_spool_replayed_total[1h]))", "legendFormat": "replayed/h", "refId": "B" }
+        {
+          "expr": "sum(increase(xingtu_tdengine_spooled_total[1h]))",
+          "legendFormat": "spooled/h",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(xingtu_tdengine_spool_replayed_total[1h]))",
+          "legendFormat": "replayed/h",
+          "refId": "B"
+        }
       ],
       "title": "Spool write / replay",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 13 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 13
+      },
       "id": 8,
-      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "textMode": "auto" },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
       "targets": [
-        { "expr": "sum(increase(xingtu_tdengine_alert_sent_total[1h]))", "legendFormat": "sent/h", "refId": "A" },
-        { "expr": "sum(increase(xingtu_tdengine_alert_failed_total[1h]))", "legendFormat": "failed/h", "refId": "B" },
-        { "expr": "sum(increase(xingtu_tdengine_alert_skipped_total[1h]))", "legendFormat": "skipped/h", "refId": "C" }
+        {
+          "expr": "sum(increase(xingtu_tdengine_alert_sent_total[1h]))",
+          "legendFormat": "sent/h",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(xingtu_tdengine_alert_failed_total[1h]))",
+          "legendFormat": "failed/h",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(increase(xingtu_tdengine_alert_skipped_total[1h]))",
+          "legendFormat": "skipped/h",
+          "refId": "C"
+        }
       ],
       "title": "Reconciliation alerts",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 13 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 13
+      },
       "id": 9,
-      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "textMode": "auto" },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
       "targets": [
-        { "expr": "sum(increase(xingtu_tdengine_dropped_total[1h]))", "legendFormat": "dropped/h", "refId": "A" },
-        { "expr": "sum(increase(xingtu_tdengine_history_pruned_total[24h]))", "legendFormat": "pruned/24h", "refId": "B" }
+        {
+          "expr": "sum(increase(xingtu_tdengine_dropped_total[1h]))",
+          "legendFormat": "dropped/h",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(xingtu_tdengine_history_pruned_total[24h]))",
+          "legendFormat": "pruned/24h",
+          "refId": "B"
+        }
       ],
       "title": "Drops / history pruning",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "id": 10,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(xingtu_reconcile_export_jobs_started_total[24h]))",
+          "legendFormat": "started/24h",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(xingtu_reconcile_export_jobs_completed_total[24h]))",
+          "legendFormat": "completed/24h",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(increase(xingtu_reconcile_export_jobs_failed_total[24h]))",
+          "legendFormat": "failed/24h",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(increase(xingtu_reconcile_export_jobs_cancelled_total[24h]))",
+          "legendFormat": "cancelled/24h",
+          "refId": "D"
+        }
+      ],
+      "title": "Reconciliation export jobs / 24h",
       "type": "stat"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["xingtu-tsp", "tdengine", "reconciliation"],
+  "tags": [
+    "xingtu-tsp",
+    "tdengine",
+    "reconciliation"
+  ],
   "templating": {
     "list": [
       {
@@ -131,7 +452,10 @@
       }
     ]
   },
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "timezone": "browser",
   "title": "Xingtu TSP - TDengine Reconciliation",
   "uid": "xingtu-tdengine-reconcile",
