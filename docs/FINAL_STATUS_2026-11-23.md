@@ -320,7 +320,11 @@ tdengine::tests::rest_query_maps_rows_to_points
 
 - `GET /api/integrations/timeseries/reconcile`
 - 比较 PG/TDengine count/min/max
+- 结果写入 `timeseries_reconciliations`
+- `GET /api/integrations/timeseries/reconciliations` 查询历史
 - 指标：checks/mismatches
+- mismatch 可推送 JSON webhook（全局冷却）
+- `GET /api/integrations/timeseries/spool` / `POST .../spool/replay`
 
 健康：
 
