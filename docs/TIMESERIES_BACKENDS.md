@@ -287,6 +287,8 @@ TDengine = 可重建的查询加速副本
 .\scripts\tdengine-smoke.ps1 -Url http://127.0.0.1:6041 -Database tsp
 ```
 
+生产多副本、保留、监控与故障处理见 [TIMESERIES_OPERATIONS.md](TIMESERIES_OPERATIONS.md)。
+
 ## 11. 容量/压测脚本
 
 ```powershell
