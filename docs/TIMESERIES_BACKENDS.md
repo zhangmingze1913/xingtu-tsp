@@ -252,6 +252,14 @@ GET /api/integrations/timeseries/reconciliations?limit=50
 - `limit` 1–200，默认 50
 - 可选 `vehicle_id`、`consistent=true|false` 过滤
 - 历史默认保留 90 天，每 6 小时清理；`0` 关闭
+- CSV 导出：
+
+```http
+GET /api/integrations/timeseries/reconciliations/export?vehicle_id=...&consistent=false
+```
+
+- 复用 `limit`（最大 200）、`vehicle_id`、`consistent` 过滤
+- `Content-Type: text/csv`
 - 定时任务只持久化 mismatch，手动接口每次持久化
 - mismatch 可推送 JSON webhook；全局冷却默认 300s
 - 失败重试 2 次（`TSP_RECONCILE_ALERT_RETRIES`）

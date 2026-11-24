@@ -98,6 +98,10 @@ pub fn build_router(state: AppState) -> Router {
             get(integrations::timeseries_reconciliations),
         )
         .route(
+            "/integrations/timeseries/reconciliations/export",
+            get(integrations::timeseries_reconciliations_export),
+        )
+        .route(
             "/integrations/timeseries/spool",
             get(integrations::timeseries_spool),
         )

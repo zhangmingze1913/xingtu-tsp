@@ -1,6 +1,7 @@
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
+    http::{header, StatusCode},
+    response::{IntoResponse, Response},
     Json,
 };
 use serde::Deserialize;
@@ -206,4 +207,77 @@ pub async fn timeseries_spool_replay(
     })?;
     let replayed = tdengine.replay_spool().await;
     Ok(Json(json!({"replayed": replayed})))
+}
+
+pub async fn timeseries_reconciliations_export(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<ReconcileHistoryQuery>,
+) -> AppResult<Response> {
+    user.require_admin()?;
+    let rows = state
+        .db
+        .list_timeseries_reconciliations(
+            query.limit.unwrap_or(200),
+            query.vehicle_id.as_deref(),
+            query.consistent,
+        )
+        .await?;
+    let csv = reconciliations_csv(&rows);
+    Ok((
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "text/csv; charset=utf-8"),
+            (
+                header::CONTENT_DISPOSITION,
+                "attachment; filename=\"timeseries-reconciliations.csv\"",
+            ),
+        ],
+        csv,
+    )
+        .into_response())
+}
+
+fn reconciliations_csv(rows: &[crate::models::TimeseriesReconciliation]) -> String {
+    let mut out = String::from(
+        "id,vehicle_id,from_ts,to_ts,pg_count,td_count,count_delta,consistent,checked_at\n",
+    );
+    for row in rows {
+        out.push_str(&format!(
+            "{},{},{},{},{},{},{},{},{}\n",
+            row.id,
+            row.vehicle_id,
+            row.from_ts,
+            row.to_ts,
+            row.pg_count,
+            row.td_count,
+            row.count_delta,
+            row.consistent,
+            row.checked_at
+        ));
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reconciliation_csv_has_header_and_rows() {
+        let row = crate::models::TimeseriesReconciliation {
+            id: "id-1".to_string(),
+            vehicle_id: "veh-1".to_string(),
+            from_ts: "a".to_string(),
+            to_ts: "b".to_string(),
+            pg_count: 10,
+            td_count: 8,
+            count_delta: 2,
+            consistent: false,
+            checked_at: "2026-11-24T00:00:00Z".to_string(),
+        };
+        let csv = reconciliations_csv(&[row]);
+        assert!(csv.starts_with("id,vehicle_id"));
+        assert!(csv.contains("id-1,veh-1,a,b,10,8,2,false"));
+    }
 }

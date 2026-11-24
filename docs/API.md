@@ -555,3 +555,12 @@ POST /integrations/timeseries/spool/replay
 - GET：spool 文件数与字节数
 - POST：立即重放失败样本
 
+## 对账历史导出
+
+```http
+GET /integrations/timeseries/reconciliations/export?vehicle_id=...&consistent=false
+```
+
+- admin only
+- CSV 列：id/vehicle_id/from_ts/to_ts/pg_count/td_count/count_delta/consistent/checked_at
+
