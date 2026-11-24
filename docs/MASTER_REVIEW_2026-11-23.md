@@ -184,7 +184,7 @@ NotApplicable    7
 ## 6. 测试结果
 
 ```text
-lib                    224 passed
+lib                    228 passed
 integration            32 passed
 fmt                    clean
 clippy                 clean
@@ -227,7 +227,7 @@ clippy                 clean
 | 缓存/协调 | Redis 8 | 保留；锁、会话、事件 |
 | 共识 | OpenRaft 3 节点 | 保留用于控制面；非生产级多机房共识 |
 | 媒体解码 | FFmpeg 子进程 | 保留；当前规模足够 |
-| 媒体存储 | 进程内媒体 + 本地文件 | RustFS 部署已加入，应用 S3 归档待接入 |
+| 媒体存储 | 进程内媒体 + RustFS 归档 | RustFS 分段上传/列表/下载已接入 |
 | 消息总线 | Redis + 可选 Iggy | 保留接口；生产建议 Kafka/NATS |
 | 时序 | PostgreSQL + 可选 TDengine | 当前数据量可保留 PG；TDengine 作为规模化选项 |
 | 可观测 | Prometheus 文本 | 建议补 OpenTelemetry trace |
@@ -284,5 +284,5 @@ flowchart LR
 4. 用真实终端抓包做 808/809/1078 互通。
 5. 确认地方标准替代版本。
 6. 建立 CI：fmt + clippy + 全量测试 + 向量测试。
-7. 上 RustFS、OpenTelemetry、KMS/HSM。
+7. 上 OpenTelemetry、KMS/HSM。
 8. 生产压测前关闭 Defender 扫描或使用独立压测机。

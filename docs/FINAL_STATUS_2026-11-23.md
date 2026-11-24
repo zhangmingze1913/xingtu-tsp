@@ -6,7 +6,7 @@
 ## 1. 验证结果
 
 ```text
-lib                    224 passed
+lib                    228 passed
 integration            32 passed
 fmt                    clean
 clippy                 clean
@@ -228,7 +228,7 @@ NotApplicable    7
 验证：
 
 ```text
-lib                    224 passed
+lib                    228 passed
 integration            32 passed
 fmt                    clean
 clippy -D warnings     clean
@@ -249,4 +249,35 @@ cluster                3 nodes healthy
 
 > 代码侧协议与主要平台链路已完成规划范围；无 Missing。
 > 真实终端/上级平台/弱网/第三方测评未执行，不能声明标准符合、认证或生产就绪。
+
+## 9. RustFS 录制/归档
+
+已接入：
+
+```text
+1078 UDP -> MediaHub 实时播放
+        -> 关键帧/时间/大小分段
+        -> raw H.264/AAC 异步上传 RustFS
+        -> /api/media/archive 列表/下载
+```
+
+配置：
+
+```text
+TSP_MEDIA_UDP_ADDR
+TSP_RUSTFS_ARCHIVE
+TSP_RUSTFS_ENDPOINT/BUCKET/REGION/ACCESS_KEY/SECRET_KEY
+TSP_RUSTFS_PREFIX
+TSP_RUSTFS_SEGMENT_SECS/BYTES
+```
+
+验证：
+
+```text
+archive_put_list_get_against_s3_mock
+media_keys_are_prefixed_and_path_safe
+prefix_and_segment_limits_have_safe_defaults
+```
+
+未验证：真实 RustFS 容器、真实 1078 终端、断点/限流/大文件/并发上传、归档 raw 的浏览器回放。
 

@@ -245,7 +245,13 @@ async fn tcp_gateway_ingests_frame_and_persists_trajectory() {
         lat: 31.2304,
         altitude_m: 8,
     };
-    let mut data = vec![0x26, 0x11, 0x23, 0x21, 0x56, 0x00];
+    let now = chrono::Utc::now() + chrono::Duration::hours(8);
+    let digits = now.format("%y%m%d%H%M%S").to_string();
+    let mut data: Vec<u8> = digits
+        .as_bytes()
+        .chunks(2)
+        .map(|pair| ((pair[0] - b'0') << 4) | (pair[1] - b'0'))
+        .collect();
     data.extend_from_slice(
         &Gb32960Section {
             data_type: SEC_VEHICLE,

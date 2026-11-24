@@ -34,7 +34,7 @@
 
 ### 环境要求
 
-- Rust 1.89+（SQLx 0.8；无需单独安装 SQLite/PostgreSQL 客户端库）
+- Rust 1.94.1+（SQLx 0.8；无需单独安装 SQLite/PostgreSQL 客户端库）
 - Windows 需要 MSVC Build Tools；macOS 需要 Xcode CLT；Linux 需要 `build-essential`
 - 无需 Node.js、数据库服务或外部 CDN
 
@@ -473,7 +473,7 @@ cargo run --release
 
 ## Object storage
 
-RustFS is the S3-compatible object store for recorded media. See [docs/RUSTFS.md](docs/RUSTFS.md) for Compose/Kubernetes, credentials, and the MinIO migration path.
+RustFS is the S3-compatible object store for recorded media. With `TSP_MEDIA_UDP_ADDR` and `TSP_RUSTFS_ARCHIVE=true`, 1078 media is segmented on keyframes/time and uploaded as raw H.264/AAC. Archive objects are listed/downloaded via `/api/media/archive`. See [docs/RUSTFS.md](docs/RUSTFS.md) for Compose/Kubernetes, credentials, and the MinIO migration path.
 
 ---
 

@@ -68,6 +68,14 @@ pub fn build_app(state: AppState) -> Router {
 pub async fn run(config: Config) -> AppResult<()> {
     let state = bootstrap::bootstrap(&config).await?;
 
+    if let Some(archive) = crate::media::archive::global().cloned() {
+        tokio::spawn(async move {
+            if let Err(error) = archive.ensure_bucket().await {
+                tracing::warn!(%error, "RustFS media bucket is not available");
+            }
+        });
+    }
+
     spawn_offline_sweeper(state.clone());
     spawn_retention_sweeper(state.clone());
     spawn_downlink_timeout_sweeper(state.clone());

@@ -26,6 +26,14 @@ data:
   TSP_JWT_PRIVATE_KEY_FILE: "/etc/tsp/secret/jwt-private.pem"
   TSP_JWT_PUBLIC_KEY_FILE: "/etc/tsp/secret/jwt-public.pem"
   RUST_LOG: "xingtu_tsp=info,tower_http=warn"
+  # JT/T 1078 media UDP + RustFS archive (bucket auto-created on startup)
+  TSP_MEDIA_UDP_ADDR: "0.0.0.0:19000"
+  TSP_RUSTFS_ARCHIVE: "true"
+  TSP_RUSTFS_ENDPOINT: "http://rustfs:9000"
+  TSP_RUSTFS_BUCKET: "tsp-media"
+  TSP_RUSTFS_REGION: "us-east-1"
+  TSP_RUSTFS_PREFIX: "media"
+  TSP_RUSTFS_SEGMENT_SECS: "30"
   # Use a managed Redis or Redis Operator in production.
   TSP_REDIS_URL: "redis://redis:6379/0"
   # Optional Apache Iggy HTTP event log. Set the URL and apply iggy.yaml to enable.

@@ -1,12 +1,18 @@
 use axum::{
     body::Body,
-    extract::Path,
+    extract::{Path, Query},
     http::{header, StatusCode},
     response::{Html, IntoResponse, Response},
+    Json,
 };
 use std::{convert::Infallible, sync::OnceLock, time::Duration};
 
-use crate::{auth::AuthUser, error::AppError, media::remux::FfmpegRemuxer};
+use crate::{
+    auth::AuthUser,
+    error::AppError,
+    media::{archive, remux::FfmpegRemuxer},
+};
+use serde::Deserialize;
 
 static SAMPLE_MP4: OnceLock<Vec<u8>> = OnceLock::new();
 
@@ -260,6 +266,66 @@ pub async fn live_mp4(
             )
         })?;
     Ok(mp4_response(&bytes))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ArchiveQuery {
+    pub sim: String,
+    pub channel: u8,
+}
+
+pub async fn archive_list(
+    _user: AuthUser,
+    Query(query): Query<ArchiveQuery>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let archive = archive::global().ok_or_else(archive_unavailable)?;
+    let prefix = archive.media_prefix(&query.sim, query.channel);
+    let objects = archive.list_prefix(&prefix).await.map_err(archive_error)?;
+    Ok(Json(serde_json::json!({
+        "prefix": prefix,
+        "objects": objects,
+    })))
+}
+
+pub async fn archive_get(_user: AuthUser, Path(key): Path<String>) -> Result<Response, AppError> {
+    let archive = archive::global().ok_or_else(archive_unavailable)?;
+    archive
+        .validate_key(&key)
+        .map_err(|error| AppError::bad_request(error.to_string()))?;
+    let bytes = archive.get(&key).await.map_err(archive_error)?;
+    let content_type = if key.ends_with(".h264") {
+        "video/h264"
+    } else if key.ends_with(".aac") {
+        "audio/aac"
+    } else {
+        "application/octet-stream"
+    };
+    let filename = key.rsplit('/').next().unwrap_or("segment.bin");
+    Ok((
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, content_type),
+            (header::CACHE_CONTROL, "private, max-age=3600"),
+            (
+                header::CONTENT_DISPOSITION,
+                &format!("attachment; filename=\"{filename}\"")[..],
+            ),
+        ],
+        bytes,
+    )
+        .into_response())
+}
+
+fn archive_unavailable() -> AppError {
+    AppError::new(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "archive_unavailable",
+        "RustFS archive is not configured",
+    )
+}
+
+fn archive_error(error: archive::ArchiveError) -> AppError {
+    AppError::new(StatusCode::BAD_GATEWAY, "archive_error", error.to_string())
 }
 
 fn mp4_response(bytes: &[u8]) -> Response {

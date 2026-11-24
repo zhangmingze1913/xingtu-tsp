@@ -6,20 +6,32 @@ services:
     ports:
       - "8090:8090"       # HTTP console + REST + WebSocket
       - "18080:18080"     # JT/T 808 TCP gateway
+      - "19000:19000/udp" # JT/T 1078 media UDP
     environment:
       TSP_BIND: 0.0.0.0:8090
       TSP_JT808_ADDR: 0.0.0.0:18080
       TSP_DATABASE: /data/tsp.db
       TSP_JWT_SECRET: change-me-in-production
       TSP_DEMO_MODE: "true"
+      TSP_MEDIA_UDP_ADDR: 0.0.0.0:19000
+      TSP_RUSTFS_ARCHIVE: "true"
+      TSP_RUSTFS_ENDPOINT: http://rustfs:9000
+      TSP_RUSTFS_BUCKET: tsp-media
+      TSP_RUSTFS_REGION: us-east-1
+      TSP_RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
+      TSP_RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin}
+      TSP_RUSTFS_PREFIX: media
+      TSP_RUSTFS_SEGMENT_SECS: "30"
       RUST_LOG: xingtu_tsp=info
+    depends_on:
+      rustfs:
+        condition: service_healthy
     volumes:
       - tsp-data:/data
     restart: unless-stopped
 
-  # S3-compatible object storage for recorded media/archives.
-  # The current API keeps live 1078 media in memory; this service is the
-  # deployment target for the S3 archive integration.
+  # S3-compatible object storage for recorded 1078 media.
+  # The app uploads raw H.264/AAC segments when TSP_RUSTFS_ARCHIVE=true.
   rustfs:
     image: rustfs/rustfs:latest
     container_name: xingtu-rustfs

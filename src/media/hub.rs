@@ -7,6 +7,7 @@ use std::{
     time::Instant,
 };
 
+use crate::media::archive;
 use crate::standards::jt1078::Jt1078Packet;
 
 use super::playback::PlaybackSession;
@@ -20,6 +21,10 @@ struct Session {
     pending_audio: Vec<u8>,
     header: Vec<u8>,
     updated: Option<Instant>,
+    record_video: Vec<u8>,
+    record_audio: Vec<u8>,
+    record_started: Option<Instant>,
+    record_sequence: u64,
 }
 
 #[derive(Default)]
@@ -31,7 +36,8 @@ const MAX_BUFFER: usize = 4 * 1024 * 1024;
 
 impl MediaHub {
     pub fn ingest(&self, packet: &Jt1078Packet) -> bool {
-        let key = (hex_sim(&packet.sim), packet.channel);
+        let sim = hex_sim(&packet.sim);
+        let key = (sim.clone(), packet.channel);
         let Ok(mut sessions) = self.sessions.lock() else {
             return false;
         };
@@ -64,6 +70,21 @@ impl MediaHub {
             }
             session.audio.extend_from_slice(&frame.annex_b);
             session.pending_audio.extend_from_slice(&frame.annex_b);
+        }
+        if archive::global().is_some() {
+            let is_video = matches!(packet.data_type, 0 | 1 | 2 | 4);
+            let is_audio = packet.data_type == 3;
+            if is_video || is_audio {
+                let keyframe = packet.data_type == 0;
+                let overdue = session.record_started.is_some_and(|started| {
+                    started.elapsed().as_secs() >= archive::segment_seconds() * 2
+                });
+                let audio_only = session.record_video.is_empty();
+                if session.record_should_flush() && (keyframe || overdue || audio_only) {
+                    session.flush_record(&sim, packet.channel);
+                }
+                session.record_frame(&frame.annex_b, is_video);
+            }
         }
         session.updated = Some(Instant::now());
         true
@@ -100,7 +121,13 @@ impl MediaHub {
         let Ok(mut sessions) = self.sessions.lock() else {
             return false;
         };
-        sessions.remove(&(sim.to_string(), channel)).is_some()
+        let removed = sessions.remove(&(sim.to_string(), channel));
+        if let Some(mut session) = removed {
+            session.flush_record(sim, channel);
+            true
+        } else {
+            false
+        }
     }
 
     pub fn list(&self) -> Vec<(String, u8, usize, usize)> {
@@ -124,6 +151,63 @@ impl MediaHub {
 
     pub fn sessions(&self) -> usize {
         self.sessions.lock().map(|s| s.len()).unwrap_or(0)
+    }
+}
+
+impl Session {
+    fn record_should_flush(&self) -> bool {
+        self.record_should_flush_for(archive::segment_seconds(), archive::segment_bytes())
+    }
+
+    fn record_should_flush_for(&self, seconds: u64, bytes: usize) -> bool {
+        let Some(started) = self.record_started else {
+            return false;
+        };
+        started.elapsed().as_secs() >= seconds
+            || self.record_video.len() + self.record_audio.len() >= bytes
+    }
+
+    fn record_frame(&mut self, frame: &[u8], is_video: bool) {
+        if self.record_started.is_none() {
+            self.record_started = Some(Instant::now());
+        }
+        if is_video {
+            self.record_video.extend_from_slice(frame);
+        } else {
+            self.record_audio.extend_from_slice(frame);
+        }
+    }
+
+    fn flush_record(&mut self, sim: &str, channel: u8) {
+        let video = std::mem::take(&mut self.record_video);
+        let audio = std::mem::take(&mut self.record_audio);
+        self.record_started = None;
+        if video.is_empty() && audio.is_empty() {
+            return;
+        }
+        let Some(archive) = archive::global().cloned() else {
+            return;
+        };
+        let sequence = self.record_sequence;
+        self.record_sequence = self.record_sequence.wrapping_add(1);
+        let at = chrono::Utc::now();
+        if !video.is_empty() {
+            let key = archive.media_key(sim, channel, at, sequence, "h264");
+            let archive = archive.clone();
+            tokio::spawn(async move {
+                if let Err(error) = archive.put(&key, video, "video/h264").await {
+                    tracing::warn!(%error, %key, "RustFS video segment upload failed");
+                }
+            });
+        }
+        if !audio.is_empty() {
+            let key = archive.media_key(sim, channel, at, sequence, "aac");
+            tokio::spawn(async move {
+                if let Err(error) = archive.put(&key, audio, "audio/aac").await {
+                    tracing::warn!(%error, %key, "RustFS audio segment upload failed");
+                }
+            });
+        }
     }
 }
 
@@ -187,5 +271,16 @@ mod tests {
         assert!(hub.clear(&sim, 1));
         assert!(!hub.clear(&sim, 1));
         assert!(hub.snapshot("000000000000", 1).is_none());
+    }
+
+    #[test]
+    fn recording_segments_flush_on_time_or_size() {
+        let mut session = Session::default();
+        assert!(!session.record_should_flush_for(30, 1024));
+        session.record_started = Some(Instant::now());
+        session.record_video = vec![0u8; 1024];
+        assert!(session.record_should_flush_for(1, 1024));
+        assert!(session.record_should_flush_for(30, 1024));
+        assert!(!session.record_should_flush_for(30, 2048));
     }
 }

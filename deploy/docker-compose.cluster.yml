@@ -39,6 +39,15 @@ services:
       TSP_JWT_SECRET: local-cluster-secret-change-me
       TSP_NODE_ID: api-a
       TSP_NODE_ROLE: api
+      TSP_MEDIA_UDP_ADDR: 0.0.0.0:19000
+      TSP_RUSTFS_ARCHIVE: "true"
+      TSP_RUSTFS_ENDPOINT: http://rustfs:9000
+      TSP_RUSTFS_BUCKET: tsp-media
+      TSP_RUSTFS_REGION: us-east-1
+      TSP_RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
+      TSP_RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin}
+      TSP_RUSTFS_PREFIX: media
+      TSP_RUSTFS_SEGMENT_SECS: "30"
       RUST_LOG: xingtu_tsp=info
     depends_on:
       postgres:
@@ -60,6 +69,8 @@ services:
   gateway-a:
     build: ..
     image: xingtu-tsp:0.1.0
+    ports:
+      - "19000:19000/udp"
     environment:
       <<: *api-env
       TSP_DEMO_MODE: "false"
@@ -70,10 +81,14 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      rustfs:
+        condition: service_healthy
 
   gateway-b:
     build: ..
     image: xingtu-tsp:0.1.0
+    ports:
+      - "19001:19000/udp"
     environment:
       <<: *api-env
       TSP_DEMO_MODE: "false"
@@ -83,6 +98,7 @@ services:
       - gateway-a
       - postgres
       - redis
+      - rustfs
 
   nginx:
     image: nginx:1.27-alpine
@@ -97,7 +113,7 @@ services:
       - gateway-a
       - gateway-b
 
-  # Optional S3-compatible object storage for recorded media/archives.
+  # S3-compatible object storage for recorded 1078 media.
   rustfs:
     image: rustfs/rustfs:latest
     container_name: xingtu-rustfs

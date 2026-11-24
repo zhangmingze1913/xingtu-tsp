@@ -21,6 +21,10 @@ spec:
       port: 18080
       targetPort: jt808
       protocol: TCP
+    - name: media-1078
+      port: 19000
+      targetPort: media-1078
+      protocol: UDP
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -76,6 +80,9 @@ spec:
               containerPort: 8090
             - name: raft
               containerPort: 7001
+            - name: media-1078
+              containerPort: 19000
+              protocol: UDP
           envFrom:
             - configMapRef:
                 name: tsp-config
@@ -103,6 +110,30 @@ spec:
               value: gateway
             - name: TSP_DEMO_MODE
               value: "false"
+            - name: TSP_RUSTFS_ENDPOINT
+              value: http://rustfs:9000
+            - name: TSP_RUSTFS_BUCKET
+              value: tsp-media
+            - name: TSP_RUSTFS_REGION
+              value: us-east-1
+            - name: TSP_RUSTFS_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tsp-secret
+                  key: rustfs-access-key
+            - name: TSP_RUSTFS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tsp-secret
+                  key: rustfs-secret-key
+            - name: TSP_RUSTFS_PREFIX
+              value: media
+            - name: TSP_MEDIA_UDP_ADDR
+              value: 0.0.0.0:19000
+            - name: TSP_RUSTFS_ARCHIVE
+              value: "true"
+            - name: TSP_RUSTFS_SEGMENT_SECS
+              value: "30"
           readinessProbe:
             httpGet:
               path: /api/health

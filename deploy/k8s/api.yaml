@@ -94,6 +94,24 @@ spec:
                   fieldPath: metadata.name
             - name: TSP_NODE_ROLE
               value: api
+            - name: TSP_RUSTFS_ENDPOINT
+              value: http://rustfs:9000
+            - name: TSP_RUSTFS_BUCKET
+              value: tsp-media
+            - name: TSP_RUSTFS_REGION
+              value: us-east-1
+            - name: TSP_RUSTFS_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tsp-secret
+                  key: rustfs-access-key
+            - name: TSP_RUSTFS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tsp-secret
+                  key: rustfs-secret-key
+            - name: TSP_RUSTFS_PREFIX
+              value: media
           readinessProbe:
             httpGet:
               path: /api/health

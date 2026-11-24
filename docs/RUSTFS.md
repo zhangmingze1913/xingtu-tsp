@@ -2,7 +2,7 @@
 
 `xingtu-tsp` 使用 [RustFS](https://github.com/rustfs/rustfs) 作为 S3 兼容对象存储，替换原方案中的 MinIO。RustFS 采用 Apache-2.0 许可，提供 S3 API、Console、版本化、对象锁、生命周期和服务端加密等能力。
 
-> 当前应用内的 1078 实时媒体仍保存在进程内 `MediaHub`，RustFS 是录制/归档媒体的部署目标。应用侧 S3 归档客户端尚未接入，详见文末“应用接入状态”。
+> 1078 实时媒体继续由进程内 `MediaHub` 提供低延迟快照/连续流；同时按关键帧/时间分段，将 raw H.264/AAC 上传 RustFS 归档。归档对象可通过 API 列出和下载。
 
 ## 端口与组件
 
@@ -108,21 +108,88 @@ bucket                       ->  同名桶或新桶
 - 开启版本化/对象锁用于取证与防篡改
 - 配置生命周期，避免录制媒体无限增长
 
-## 应用接入状态
+## 应用接入
 
-当前状态：
+### 配置
 
-- `docker-compose.yml`、`deploy/docker-compose.cluster.yml` 已包含 RustFS
-- `deploy/k8s/rustfs.yaml` 已加入 Kustomization
-- `.env.example` 已加入 RustFS 凭据
-- 应用尚未使用 S3 SDK 上传录制媒体
-
-下一步接入点：
-
-```text
-src/media/hub.rs       录制片段落盘/上传
-src/api/media.rs       回放/下载时从 S3 读取
-src/config.rs          TSP_S3_ENDPOINT / BUCKET / REGION / 凭据
+```bash
+TSP_MEDIA_UDP_ADDR=0.0.0.0:19000
+TSP_RUSTFS_ARCHIVE=true
+TSP_RUSTFS_ENDPOINT=http://rustfs:9000
+TSP_RUSTFS_BUCKET=tsp-media
+TSP_RUSTFS_REGION=us-east-1
+TSP_RUSTFS_ACCESS_KEY=rustfsadmin
+TSP_RUSTFS_SECRET_KEY=rustfsadmin
+TSP_RUSTFS_PREFIX=media
+TSP_RUSTFS_SEGMENT_SECS=30
+TSP_RUSTFS_SEGMENT_BYTES=8388608
 ```
 
-在此之前，RustFS 可用于验证 S3 兼容性、桶策略和运维流程，但不要宣称“媒体已经写入 RustFS”。
+`TSP_RUSTFS_ARCHIVE` 未开启时，录制和上传完全关闭，`MediaHub` 行为与之前一致。
+
+启动时应用会调用 HeadBucket；桶不存在时自动创建。生产建议预创建桶并收紧应用凭据权限。
+
+### 录制行为
+
+- 数据来源：`TSP_MEDIA_UDP_ADDR` 上的 1078 媒体包
+- 视频：H.264 Annex-B，`video/h264`
+- 音频：AAC ADTS，`audio/aac`
+- 分段触发：
+  - 遇到 I 帧且达到 `TSP_RUSTFS_SEGMENT_SECS` 或 `TSP_RUSTFS_SEGMENT_BYTES`
+  - 超过 2 倍时间上限时兜底切分
+  - 会话 `DELETE` 时强制冲刷
+- 会话 `clear` 会触发当前分段上传
+- 上传异步执行，不阻塞 1078 接收循环
+
+对象键：
+
+```text
+media/{sim}/{channel}/YYYY/MM/DD/HHMMSS-{sequence}.h264
+media/{sim}/{channel}/YYYY/MM/DD/HHMMSS-{sequence}.aac
+```
+
+### 归档 API
+
+列出对象：
+
+```http
+GET /api/media/archive?sim=138000000001&channel=1
+Authorization: Bearer <token>
+```
+
+下载对象：
+
+```http
+GET /api/media/archive/media/138000000001/1/2026/11/24/080001-000000.h264
+Authorization: Bearer <token>
+```
+
+`key` 必须带 `TSP_RUSTFS_PREFIX` 前缀，且拒绝 `..`、反斜杠和目录结尾。
+
+### 代码位置
+
+```text
+src/media/archive.rs   RustFS S3 客户端、对象键、上传/列表/下载
+src/media/hub.rs       分段缓冲、I 帧/时间/大小触发、异步上传
+src/api/media.rs       归档列表/下载 API
+src/lib.rs             启动时确保桶存在
+```
+
+### 测试
+
+- `media_keys_are_prefixed_and_path_safe`
+- `prefix_and_segment_limits_have_safe_defaults`
+- `archive_put_list_get_against_s3_mock`：真实 S3 客户端对 mock 发起 PUT/GET/ListObjectsV2
+
+未执行：
+
+- 真实 RustFS 容器的上传/下载
+- 断点、限流、大文件、并发上传
+- 归档对象的播放器回放（当前只提供 raw 下载）
+
+### 限制
+
+- 归档为 raw Annex-B/ADTS，不是 MP4；浏览器播放需要先 remux
+- 分段以 I 帧为优先边界；兜底切分可能从非 I 帧开始
+- 音频/视频分段分别上传，不保证同名对象原子成对
+- 未实现归档生命周期、对象锁、跨区域复制

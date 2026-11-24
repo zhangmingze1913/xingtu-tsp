@@ -44,6 +44,7 @@ tokio-rustls = { version = "0.26", default-features = false, features = ["ring",
 rustls-pemfile = "2"
 ipnet = "2"
 dotenvy = "0.15"
+aws-sdk-s3 = "=1.65.0"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
