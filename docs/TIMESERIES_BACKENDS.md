@@ -140,6 +140,34 @@ kubectl -n xingtu-tsp rollout restart deployment/tsp-jt808
 
 `deploy/k8s/tdengine.yaml` 是单节点评估清单，未加入默认 Kustomization；生产使用 TDengine Operator/Helm 三节点集群。
 
+### 持久化 spool
+
+默认 K8s spool 位于 `/tmp/tdengine-spool`，Pod 重建会丢失。若 StorageClass 支持 `ReadWriteMany`：
+
+```bash
+kubectl -n xingtu-tsp apply -f deploy/k8s/tdengine-spool.yaml
+```
+
+给 API/网关挂载：
+
+```bash
+kubectl -n xingtu-tsp patch deployment tsp-api --type=strategic -p '
+{"spec":{"template":{"spec":{
+  "volumes":[{"name":"tdengine-spool","persistentVolumeClaim":{"claimName":"tdengine-spool"}}],
+  "containers":[{"name":"api","volumeMounts":[{"name":"tdengine-spool","mountPath":"/tmp/tdengine-spool"}]}]
+}}}}'
+
+kubectl -n xingtu-tsp patch deployment tsp-jt808 --type=strategic -p '
+{"spec":{"template":{"spec":{
+  "volumes":[{"name":"tdengine-spool","persistentVolumeClaim":{"claimName":"tdengine-spool"}}],
+  "containers":[{"name":"gateway","volumeMounts":[{"name":"tdengine-spool","mountPath":"/tmp/tdengine-spool"}]}]
+}}}}'
+```
+
+如果只有 `ReadWriteOnce`，不要多副本共享同一 PVC；应改为每 Pod 独立 StatefulSet PVC，或接受临时 spool。
+
+Compose 集群已使用命名卷 `tdengine-spool`，可直接持久化。
+
 ## 6. 数据模型
 
 应用启动时自动执行：

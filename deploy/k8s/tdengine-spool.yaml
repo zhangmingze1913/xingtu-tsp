@@ -1,0 +1,16 @@
+# Optional persistent spool for TDengine write failures.
+#
+# Requires a StorageClass that supports ReadWriteMany because the API and
+# gateway Deployments may run multiple replicas. If your cluster only supports
+# ReadWriteOnce, use a per-pod StatefulSet or keep the default /tmp spool and
+# accept pod-lifetime durability.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tdengine-spool
+  namespace: xingtu-tsp
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources:
+    requests:
+      storage: 10Gi
