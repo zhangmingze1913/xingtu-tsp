@@ -97,6 +97,14 @@ pub fn build_router(state: AppState) -> Router {
             "/integrations/timeseries/reconciliations",
             get(integrations::timeseries_reconciliations),
         )
+        .route(
+            "/integrations/timeseries/spool",
+            get(integrations::timeseries_spool),
+        )
+        .route(
+            "/integrations/timeseries/spool/replay",
+            axum::routing::post(integrations::timeseries_spool_replay),
+        )
         .route("/terminals", get(terminals::list))
         .route("/terminals/export", get(terminals::export))
         .route("/terminals/{id}", get(terminals::get))

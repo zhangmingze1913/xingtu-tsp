@@ -281,6 +281,18 @@ TDengine = 可重建的查询加速副本
 - TDengine 写入延迟与失败指标
 - 保留策略与磁盘容量规划
 
+### spool 运维接口
+
+```http
+GET /api/integrations/timeseries/spool
+POST /api/integrations/timeseries/spool/replay
+```
+
+- admin only
+- GET 返回 `{files, bytes}`
+- POST 立即重放并返回 `{replayed}`
+- spool 未配置时返回 503
+
 ## 10. 真实 TDengine 联调脚本
 
 ```powershell

@@ -103,6 +103,20 @@ impl TdengineSpool {
         Ok(())
     }
 
+    pub async fn usage(&self) -> std::io::Result<(usize, u64)> {
+        let mut entries = tokio::fs::read_dir(&self.dir).await?;
+        let mut files = 0usize;
+        let mut bytes = 0u64;
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+            if path.extension().and_then(|value| value.to_str()) == Some("json") {
+                files += 1;
+                bytes += entry.metadata().await.map(|meta| meta.len()).unwrap_or(0);
+            }
+        }
+        Ok((files, bytes))
+    }
+
     pub async fn count(&self) -> std::io::Result<usize> {
         let mut entries = tokio::fs::read_dir(&self.dir).await?;
         let mut count = 0;
@@ -165,6 +179,17 @@ mod tests {
         let spool = TdengineSpool::new(&dir, 1).expect("spool");
         spool.save(&sample()).await.expect("first");
         assert!(spool.save(&sample()).await.is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn spool_reports_usage() {
+        let dir = std::env::temp_dir().join(format!("tsp-td-usage-{}", uuid::Uuid::new_v4()));
+        let spool = TdengineSpool::new(&dir, 10).expect("spool");
+        spool.save(&sample()).await.expect("save");
+        let (files, bytes) = spool.usage().await.expect("usage");
+        assert_eq!(files, 1);
+        assert!(bytes > 0);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

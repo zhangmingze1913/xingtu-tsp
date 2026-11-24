@@ -544,3 +544,14 @@ GET /integrations/timeseries/reconciliations?limit=50
 - 返回 `items`：vehicle_id/from/to/pg_count/td_count/count_delta/consistent/checked_at
 - 定时任务只记录 mismatch；手动对账每次记录
 
+## TDengine spool
+
+```http
+GET /integrations/timeseries/spool
+POST /integrations/timeseries/spool/replay
+```
+
+- admin only
+- GET：spool 文件数与字节数
+- POST：立即重放失败样本
+

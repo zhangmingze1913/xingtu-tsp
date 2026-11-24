@@ -166,3 +166,38 @@ pub async fn timeseries_reconciliations(
         .await?;
     Ok(Json(json!({"items": rows})))
 }
+
+pub async fn timeseries_spool(
+    State(_state): State<AppState>,
+    user: AuthUser,
+) -> AppResult<Json<Value>> {
+    user.require_admin()?;
+    let Some(spool) = crate::tdengine_spool::global() else {
+        return Err(AppError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "spool_disabled",
+            "TDengine spool is not configured",
+        ));
+    };
+    let (files, bytes) = spool
+        .usage()
+        .await
+        .map_err(|error| AppError::internal(format!("TDengine spool usage failed: {error}")))?;
+    Ok(Json(json!({"files": files, "bytes": bytes})))
+}
+
+pub async fn timeseries_spool_replay(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> AppResult<Json<Value>> {
+    user.require_admin()?;
+    let tdengine = state.tdengine.as_ref().ok_or_else(|| {
+        AppError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "tdengine_unavailable",
+            "TDengine is not enabled",
+        )
+    })?;
+    let replayed = tdengine.replay_spool().await;
+    Ok(Json(json!({"replayed": replayed})))
+}
