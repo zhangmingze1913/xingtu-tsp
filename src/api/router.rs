@@ -130,6 +130,10 @@ pub fn build_router(state: AppState) -> Router {
             axum::routing::post(integrations::resume_reconciliation_export_job),
         )
         .route(
+            "/integrations/timeseries/reconciliations/export/download/{token}",
+            get(integrations::download_reconciliation_export_by_token),
+        )
+        .route(
             "/integrations/timeseries/spool",
             get(integrations::timeseries_spool),
         )

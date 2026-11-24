@@ -5,8 +5,11 @@ use axum::{
     response::Response,
     Json,
 };
+use base64::Engine as _;
+use hmac::{Hmac, Mac};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use sha2::Sha256;
 
 use crate::{
     auth::AuthUser,
@@ -162,6 +165,63 @@ pub async fn timeseries_reconcile(
         "consistent": delta == 0,
         "note": "count-based comparison; PG remains authoritative",
     })))
+}
+
+fn export_token_secret() -> Option<String> {
+    for name in ["TSP_EXPORT_TOKEN_SECRET", "TSP_JWT_SECRET"] {
+        if let Ok(value) = std::env::var(name) {
+            if !value.trim().is_empty() {
+                return Some(value);
+            }
+        }
+    }
+    None
+}
+
+fn export_token_ttl() -> i64 {
+    std::env::var("TSP_EXPORT_TOKEN_TTL_SECS")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .map(|value| value.clamp(30, 3600))
+        .unwrap_or(600)
+}
+
+fn hmac_hex(secret: &str, body: &[u8]) -> String {
+    let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).expect("HMAC key");
+    mac.update(body);
+    mac.finalize()
+        .into_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn issue_export_token(job_id: &str) -> Option<(String, i64)> {
+    let secret = export_token_secret()?;
+    let ttl = export_token_ttl();
+    let expires = chrono::Utc::now().timestamp() + ttl;
+    let payload = format!("{job_id}.{expires}");
+    let encoded = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(payload.as_bytes());
+    let signature = hmac_hex(&secret, encoded.as_bytes());
+    Some((format!("{encoded}.{signature}"), ttl))
+}
+
+fn verify_export_token(token: &str) -> Option<String> {
+    let secret = export_token_secret()?;
+    let (encoded, signature) = token.rsplit_once('.')?;
+    let expected = hmac_hex(&secret, encoded.as_bytes());
+    if expected != signature {
+        return None;
+    }
+    let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(encoded)
+        .ok()?;
+    let payload = String::from_utf8(decoded).ok()?;
+    let (job_id, expires) = payload.rsplit_once('.')?;
+    if expires.parse::<i64>().ok()? < chrono::Utc::now().timestamp() {
+        return None;
+    }
+    Some(job_id.to_string())
 }
 
 fn parse_history_cursor(raw: Option<&str>) -> AppResult<Option<(&str, &str)>> {
@@ -661,9 +721,14 @@ async fn run_reconciliation_export_inner(
             }
         }
         let remaining = (max_rows - written).clamp(1, 500);
-        let page = state
-            .db
-            .list_timeseries_reconciliations_page(
+        let page_timeout = std::env::var("TSP_RECONCILE_EXPORT_PAGE_TIMEOUT_SECS")
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .map(|value| value.clamp(5, 100))
+            .unwrap_or(60);
+        let page = tokio::time::timeout(
+            std::time::Duration::from_secs(page_timeout),
+            state.db.list_timeseries_reconciliations_page(
                 remaining,
                 cursor
                     .as_ref()
@@ -671,8 +736,10 @@ async fn run_reconciliation_export_inner(
                 vehicle_id.as_deref(),
                 org_name.as_deref(),
                 consistent,
-            )
-            .await?;
+            ),
+        )
+        .await
+        .map_err(|_| AppError::internal("export page timed out"))??;
         if page.is_empty() {
             break;
         }
@@ -745,7 +812,15 @@ pub async fn reconciliation_export_job(
     if !user.is_admin() && job.org_name != user.org_name {
         return Err(AppError::forbidden("无权访问该导出任务"));
     }
-    Ok(Json(json!(job)))
+    let mut value = serde_json::to_value(&job)
+        .map_err(|error| AppError::internal(format!("job serialize: {error}")))?;
+    if job.status == "completed" {
+        if let Some((token, ttl)) = issue_export_token(&id) {
+            value["download_token"] = json!(token);
+            value["download_expires_in"] = json!(ttl);
+        }
+    }
+    Ok(Json(value))
 }
 
 pub async fn download_reconciliation_export_job(
@@ -923,4 +998,55 @@ pub(crate) async fn recover_export_job(state: AppState, id: String) {
         )
         .await;
     });
+}
+
+pub async fn download_reconciliation_export_by_token(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+) -> AppResult<Response> {
+    let id = verify_export_token(&token)
+        .ok_or_else(|| AppError::unauthorized("下载令牌无效或已过期"))?;
+    let job = state
+        .db
+        .get_reconciliation_export_job(&id)
+        .await?
+        .ok_or_else(|| AppError::not_found("导出任务不存在"))?;
+    if job.status != "completed" {
+        return Err(AppError::new(
+            StatusCode::CONFLICT,
+            "export_not_ready",
+            "导出任务尚未完成",
+        ));
+    }
+    let dir = std::env::var("TSP_RECONCILE_EXPORT_DIR")
+        .unwrap_or_else(|_| "data/reconcile-exports".to_string());
+    let bytes = tokio::fs::read(format!("{dir}/{id}.csv"))
+        .await
+        .map_err(|error| AppError::internal(format!("export read: {error}")))?;
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "text/csv; charset=utf-8")
+        .header(
+            header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"reconciliation-export-{id}.csv\""),
+        )
+        .body(Body::from(bytes))
+        .map_err(|error| AppError::internal(format!("export response: {error}")))
+}
+
+#[cfg(test)]
+mod token_tests {
+    use super::*;
+
+    #[test]
+    fn export_download_token_roundtrip() {
+        std::env::set_var("TSP_EXPORT_TOKEN_SECRET", "test-export-secret");
+        std::env::set_var("TSP_EXPORT_TOKEN_TTL_SECS", "60");
+        let (token, ttl) = issue_export_token("job-1").expect("token");
+        assert_eq!(ttl, 60);
+        assert_eq!(verify_export_token(&token).as_deref(), Some("job-1"));
+        let mut tampered = token.clone();
+        tampered.push('0');
+        assert!(verify_export_token(&tampered).is_none());
+    }
 }

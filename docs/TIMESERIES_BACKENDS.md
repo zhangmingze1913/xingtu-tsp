@@ -417,6 +417,8 @@ POST body：
 - 文件目录：`TSP_RECONCILE_EXPORT_DIR`
 - 非管理员只能访问本组织任务
 - worker 每页检查 `cancelled` 状态，取消后删除临时文件
+- 完成任务的状态响应包含 `download_token`（默认 10 分钟）
+- 无登录下载：`GET /api/integrations/timeseries/reconciliations/export/download/{token}`
 - `failed` / `cancelled` 任务可重试，重置进度并重新执行
 - 重试前会覆盖旧 CSV，避免文件冲突
 - `running` 任务超过 `TSP_RECONCILE_EXPORT_STALE_SECS`（默认 60s）可手动 resume
