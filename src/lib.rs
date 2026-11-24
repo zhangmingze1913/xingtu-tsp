@@ -326,9 +326,17 @@ fn spawn_tdengine_reconciler(state: AppState) {
                         delta,
                         "TDengine/PG reconciliation mismatch"
                     );
+                    let org_name = state
+                        .db
+                        .vehicle_org_name(id)
+                        .await
+                        .unwrap_or_default()
+                        .unwrap_or_default();
                     if let Err(error) = state
                         .db
-                        .record_timeseries_reconciliation(id, &from, &to, pg.count, td.count, delta)
+                        .record_timeseries_reconciliation(
+                            id, &org_name, &from, &to, pg.count, td.count, delta,
+                        )
                         .await
                     {
                         tracing::warn!(%error, vehicle = %id, "reconciliation history write failed");

@@ -202,6 +202,11 @@ impl Db {
              ON timeseries_reconciliations(checked_at)",
         )
         .await?;
+        self.apply_migration(
+            "0022_timeseries_reconciliations_org",
+            "ALTER TABLE timeseries_reconciliations ADD COLUMN org_name VARCHAR(128) NOT NULL DEFAULT ''",
+        )
+        .await?;
         Ok(())
     }
 

@@ -133,9 +133,22 @@ pub async fn timeseries_reconcile(
         )
         .await;
     }
+    let org_name = state
+        .db
+        .vehicle_org_name(&query.vehicle_id)
+        .await?
+        .unwrap_or_default();
     let id = state
         .db
-        .record_timeseries_reconciliation(&query.vehicle_id, &from, &to, pg.count, td.count, delta)
+        .record_timeseries_reconciliation(
+            &query.vehicle_id,
+            &org_name,
+            &from,
+            &to,
+            pg.count,
+            td.count,
+            delta,
+        )
         .await?;
     Ok(Json(json!({
         "id": id,
@@ -154,6 +167,7 @@ pub async fn timeseries_reconcile(
 pub struct ReconcileHistoryQuery {
     pub limit: Option<i64>,
     pub vehicle_id: Option<String>,
+    pub org_name: Option<String>,
     pub consistent: Option<bool>,
 }
 
@@ -168,6 +182,7 @@ pub async fn timeseries_reconciliations(
         .list_timeseries_reconciliations(
             query.limit.unwrap_or(50),
             query.vehicle_id.as_deref(),
+            query.org_name.as_deref(),
             query.consistent,
         )
         .await?;
@@ -220,6 +235,7 @@ pub async fn timeseries_reconciliations_export(
         .list_timeseries_reconciliations(
             query.limit.unwrap_or(200),
             query.vehicle_id.as_deref(),
+            query.org_name.as_deref(),
             query.consistent,
         )
         .await?;
@@ -240,13 +256,14 @@ pub async fn timeseries_reconciliations_export(
 
 fn reconciliations_csv(rows: &[crate::models::TimeseriesReconciliation]) -> String {
     let mut out = String::from(
-        "id,vehicle_id,from_ts,to_ts,pg_count,td_count,count_delta,consistent,checked_at\n",
+        "id,vehicle_id,org_name,from_ts,to_ts,pg_count,td_count,count_delta,consistent,checked_at\n",
     );
     for row in rows {
         out.push_str(&format!(
-            "{},{},{},{},{},{},{},{},{}\n",
+            "{},{},{},{},{},{},{},{},{},{}\n",
             row.id,
             row.vehicle_id,
+            row.org_name,
             row.from_ts,
             row.to_ts,
             row.pg_count,
@@ -268,6 +285,7 @@ mod tests {
         let row = crate::models::TimeseriesReconciliation {
             id: "id-1".to_string(),
             vehicle_id: "veh-1".to_string(),
+            org_name: "Org-1".to_string(),
             from_ts: "a".to_string(),
             to_ts: "b".to_string(),
             pg_count: 10,
@@ -278,6 +296,6 @@ mod tests {
         };
         let csv = reconciliations_csv(&[row]);
         assert!(csv.starts_with("id,vehicle_id"));
-        assert!(csv.contains("id-1,veh-1,a,b,10,8,2,false"));
+        assert!(csv.contains("id-1,veh-1,Org-1,a,b,10,8,2,false"));
     }
 }

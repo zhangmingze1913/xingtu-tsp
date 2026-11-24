@@ -7,9 +7,19 @@ use crate::{error::AppResult, models::TimeseriesReconciliation};
 use super::Db;
 
 impl Db {
+    pub async fn vehicle_org_name(&self, vehicle_id: &str) -> AppResult<Option<String>> {
+        let row = self
+            .query("SELECT org_name FROM vehicles WHERE id = ?1")
+            .bind(vehicle_id)
+            .fetch_optional(self.pool())
+            .await?;
+        Ok(row.map(|row| row.get::<String, _>(0)))
+    }
+
     pub async fn record_timeseries_reconciliation(
         &self,
         vehicle_id: &str,
+        org_name: &str,
         from_ts: &str,
         to_ts: &str,
         pg_count: i64,
@@ -20,11 +30,12 @@ impl Db {
         let checked_at = crate::util::now_iso();
         self.query(
             "INSERT INTO timeseries_reconciliations
-             (id, vehicle_id, from_ts, to_ts, pg_count, td_count, count_delta, consistent, checked_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+             (id, vehicle_id, org_name, from_ts, to_ts, pg_count, td_count, count_delta, consistent, checked_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         )
         .bind(&id)
         .bind(vehicle_id)
+        .bind(org_name)
         .bind(from_ts)
         .bind(to_ts)
         .bind(pg_count)
@@ -41,18 +52,21 @@ impl Db {
         &self,
         limit: i64,
         vehicle_id: Option<&str>,
+        org_name: Option<&str>,
         consistent: Option<bool>,
     ) -> AppResult<Vec<TimeseriesReconciliation>> {
         let rows = self
             .query(
-                "SELECT id, vehicle_id, from_ts, to_ts, pg_count, td_count,
+                "SELECT id, vehicle_id, org_name, from_ts, to_ts, pg_count, td_count,
                         count_delta, consistent, checked_at
                  FROM timeseries_reconciliations
                  WHERE (?1 IS NULL OR vehicle_id = ?1)
-                   AND (?2 IS NULL OR consistent = ?2)
-                 ORDER BY checked_at DESC LIMIT ?3",
+                   AND (?2 IS NULL OR org_name = ?2)
+                   AND (?3 IS NULL OR consistent = ?3)
+                 ORDER BY checked_at DESC LIMIT ?4",
             )
             .bind(vehicle_id)
+            .bind(org_name)
             .bind(consistent.map(i64::from))
             .bind(limit.clamp(1, 200))
             .fetch_all(self.pool())
@@ -62,13 +76,14 @@ impl Db {
             .map(|row| TimeseriesReconciliation {
                 id: row.get::<String, _>(0),
                 vehicle_id: row.get::<String, _>(1),
-                from_ts: row.get::<String, _>(2),
-                to_ts: row.get::<String, _>(3),
-                pg_count: row.get::<i64, _>(4),
-                td_count: row.get::<i64, _>(5),
-                count_delta: row.get::<i64, _>(6),
-                consistent: row.get::<i64, _>(7) != 0,
-                checked_at: row.get::<String, _>(8),
+                org_name: row.get::<String, _>(2),
+                from_ts: row.get::<String, _>(3),
+                to_ts: row.get::<String, _>(4),
+                pg_count: row.get::<i64, _>(5),
+                td_count: row.get::<i64, _>(6),
+                count_delta: row.get::<i64, _>(7),
+                consistent: row.get::<i64, _>(8) != 0,
+                checked_at: row.get::<String, _>(9),
             })
             .collect())
     }
@@ -92,6 +107,7 @@ mod tests {
         let id = db
             .record_timeseries_reconciliation(
                 "veh-1",
+                "Org-1",
                 "2026-11-24T00:00:00Z",
                 "2026-11-24T01:00:00Z",
                 10,
@@ -101,7 +117,7 @@ mod tests {
             .await
             .expect("record");
         let rows = db
-            .list_timeseries_reconciliations(10, None, None)
+            .list_timeseries_reconciliations(10, None, None, None)
             .await
             .expect("list");
         assert_eq!(rows.len(), 1);
@@ -115,11 +131,12 @@ mod tests {
         let db = Db::in_memory().await.expect("db");
         db.query(
             "INSERT INTO timeseries_reconciliations
-             (id, vehicle_id, from_ts, to_ts, pg_count, td_count, count_delta, consistent, checked_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+             (id, vehicle_id, org_name, from_ts, to_ts, pg_count, td_count, count_delta, consistent, checked_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         )
         .bind("old")
         .bind("veh-old")
+        .bind("")
         .bind("a")
         .bind("b")
         .bind(1i64)
@@ -136,7 +153,7 @@ mod tests {
             .expect("prune");
         assert_eq!(pruned, 1);
         assert!(db
-            .list_timeseries_reconciliations(10, None, None)
+            .list_timeseries_reconciliations(10, None, None, None)
             .await
             .expect("list")
             .is_empty());

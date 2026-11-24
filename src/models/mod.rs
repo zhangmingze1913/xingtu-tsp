@@ -122,6 +122,7 @@ pub struct TelemetryPoint {
 pub struct TimeseriesReconciliation {
     pub id: String,
     pub vehicle_id: String,
+    pub org_name: String,
     pub from_ts: String,
     pub to_ts: String,
     pub pg_count: i64,

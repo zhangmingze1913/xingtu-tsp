@@ -558,9 +558,9 @@ POST /integrations/timeseries/spool/replay
 ## 对账历史导出
 
 ```http
-GET /integrations/timeseries/reconciliations/export?vehicle_id=...&consistent=false
+GET /integrations/timeseries/reconciliations/export?vehicle_id=...&org_name=...&consistent=false
 ```
 
 - admin only
-- CSV 列：id/vehicle_id/from_ts/to_ts/pg_count/td_count/count_delta/consistent/checked_at
+- CSV 列：id/vehicle_id/org_name/from_ts/to_ts/pg_count/td_count/count_delta/consistent/checked_at
 
