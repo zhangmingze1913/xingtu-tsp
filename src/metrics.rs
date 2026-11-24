@@ -237,6 +237,28 @@ impl Metrics {
             "xingtu_tdengine_reconcile_mismatches_total {}\n",
             tdengine.reconcile_mismatches
         ));
+        out.push_str(
+            "# HELP xingtu_tdengine_alert_sent_total Reconciliation alert webhooks sent.\n",
+        );
+        out.push_str("# TYPE xingtu_tdengine_alert_sent_total counter\n");
+        out.push_str(&format!(
+            "xingtu_tdengine_alert_sent_total {}\n",
+            tdengine.alerts_sent
+        ));
+        out.push_str(
+            "# HELP xingtu_tdengine_alert_failed_total Reconciliation alert webhook failures.\n",
+        );
+        out.push_str("# TYPE xingtu_tdengine_alert_failed_total counter\n");
+        out.push_str(&format!(
+            "xingtu_tdengine_alert_failed_total {}\n",
+            tdengine.alerts_failed
+        ));
+        out.push_str("# HELP xingtu_tdengine_alert_skipped_total Alerts skipped by cooldown.\n");
+        out.push_str("# TYPE xingtu_tdengine_alert_skipped_total counter\n");
+        out.push_str(&format!(
+            "xingtu_tdengine_alert_skipped_total {}\n",
+            tdengine.alerts_skipped
+        ));
         out.push_str("# HELP xingtu_tdengine_writes_total TDengine samples written.\n");
         out.push_str("# TYPE xingtu_tdengine_writes_total counter\n");
         out.push_str(&format!(
@@ -323,5 +345,6 @@ mod tests {
         assert!(text.contains("xingtu_tdengine_queue_depth"));
         assert!(text.contains("xingtu_tdengine_spool_pending"));
         assert!(text.contains("xingtu_tdengine_reconcile_checks_total"));
+        assert!(text.contains("xingtu_tdengine_alert_sent_total"));
     }
 }

@@ -30,6 +30,9 @@ pub static DROPPED: AtomicU64 = AtomicU64::new(0);
 pub static QUEUE_DEPTH: AtomicI64 = AtomicI64::new(0);
 pub static RECONCILE_CHECKS: AtomicU64 = AtomicU64::new(0);
 pub static RECONCILE_MISMATCHES: AtomicU64 = AtomicU64::new(0);
+pub static ALERTS_SENT: AtomicU64 = AtomicU64::new(0);
+pub static ALERTS_FAILED: AtomicU64 = AtomicU64::new(0);
+pub static ALERTS_SKIPPED: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TdengineStats {
@@ -40,6 +43,9 @@ pub struct TdengineStats {
     pub queue_depth: i64,
     pub reconcile_checks: u64,
     pub reconcile_mismatches: u64,
+    pub alerts_sent: u64,
+    pub alerts_failed: u64,
+    pub alerts_skipped: u64,
 }
 
 pub fn stats() -> TdengineStats {
@@ -51,6 +57,9 @@ pub fn stats() -> TdengineStats {
         queue_depth: QUEUE_DEPTH.load(Ordering::Relaxed),
         reconcile_checks: RECONCILE_CHECKS.load(Ordering::Relaxed),
         reconcile_mismatches: RECONCILE_MISMATCHES.load(Ordering::Relaxed),
+        alerts_sent: ALERTS_SENT.load(Ordering::Relaxed),
+        alerts_failed: ALERTS_FAILED.load(Ordering::Relaxed),
+        alerts_skipped: ALERTS_SKIPPED.load(Ordering::Relaxed),
     }
 }
 
@@ -414,6 +423,79 @@ impl TdengineStore {
     }
 }
 
+/// Send one reconciliation mismatch alert. A global cooldown prevents a
+/// scheduled run from flooding the webhook once per vehicle.
+pub async fn notify_reconcile_mismatch(
+    vehicle_id: &str,
+    from: &str,
+    to: &str,
+    pg_count: i64,
+    td_count: i64,
+    delta: i64,
+) {
+    let Ok(url) = std::env::var("TSP_RECONCILE_ALERT_WEBHOOK") else {
+        return;
+    };
+    if url.trim().is_empty() {
+        return;
+    }
+    let cooldown = std::env::var("TSP_RECONCILE_ALERT_COOLDOWN_SECS")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(300)
+        .max(1);
+    static LAST_ALERT: AtomicI64 = AtomicI64::new(0);
+    let now = Utc::now().timestamp();
+    let previous = LAST_ALERT.load(Ordering::Relaxed);
+    if now - previous < cooldown
+        || LAST_ALERT
+            .compare_exchange(previous, now, Ordering::Relaxed, Ordering::Relaxed)
+            .is_err()
+    {
+        ALERTS_SKIPPED.fetch_add(1, Ordering::Relaxed);
+        return;
+    }
+    let payload = serde_json::json!({
+        "type": "tdengine_reconcile_mismatch",
+        "vehicle_id": vehicle_id,
+        "from": from,
+        "to": to,
+        "pg_count": pg_count,
+        "tdengine_count": td_count,
+        "count_delta": delta,
+        "checked_at": Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+    });
+    match send_webhook(url.trim(), &payload).await {
+        Ok(()) => {
+            ALERTS_SENT.fetch_add(1, Ordering::Relaxed);
+        }
+        Err(error) => {
+            ALERTS_FAILED.fetch_add(1, Ordering::Relaxed);
+            tracing::warn!(%error, %url, "reconciliation alert webhook failed");
+        }
+    }
+}
+
+pub(crate) async fn send_webhook(url: &str, payload: &Value) -> AppResult<()> {
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(|error| AppError::internal(format!("alert client: {error}")))?;
+    let response = client
+        .post(url)
+        .json(payload)
+        .send()
+        .await
+        .map_err(|error| AppError::internal(format!("alert request: {error}")))?;
+    if !response.status().is_success() {
+        return Err(AppError::internal(format!(
+            "alert webhook HTTP {}",
+            response.status()
+        )));
+    }
+    Ok(())
+}
+
 fn timestamp_text(value: &Value) -> Option<String> {
     if let Some(text) = value.as_str() {
         return Some(text.to_string());
@@ -632,5 +714,37 @@ mod tests {
         assert_eq!(stats.count, 5);
         assert_eq!(stats.min_ts.as_deref(), Some("2023-11-14T22:13:20Z"));
         assert_eq!(stats.max_ts.as_deref(), Some("2023-11-14T23:13:20Z"));
+    }
+
+    #[tokio::test]
+    async fn webhook_posts_json_payload() {
+        use std::sync::{Arc, Mutex};
+
+        use axum::{extract::State, routing::post, Json, Router};
+
+        type Seen = Arc<Mutex<Vec<serde_json::Value>>>;
+
+        async fn alert(State(seen): State<Seen>, Json(value): Json<serde_json::Value>) {
+            seen.lock().unwrap().push(value);
+        }
+
+        let seen: Seen = Arc::new(Mutex::new(Vec::new()));
+        let app = Router::new().route("/alert", post(alert).with_state(seen.clone()));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        send_webhook(
+            &format!("http://{addr}/alert"),
+            &serde_json::json!({"type": "tdengine_reconcile_mismatch", "delta": 2}),
+        )
+        .await
+        .expect("webhook");
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 1);
+        assert_eq!(seen[0]["delta"], 2);
     }
 }

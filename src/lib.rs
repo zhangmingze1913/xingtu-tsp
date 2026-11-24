@@ -303,6 +303,10 @@ fn spawn_tdengine_reconciler(state: AppState) {
                     {
                         tracing::warn!(%error, vehicle = %id, "reconciliation history write failed");
                     }
+                    crate::tdengine::notify_reconcile_mismatch(
+                        id, &from, &to, pg.count, td.count, delta,
+                    )
+                    .await;
                 }
             }
             if mismatches > 0 {

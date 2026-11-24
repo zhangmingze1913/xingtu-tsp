@@ -121,6 +121,17 @@ pub async fn timeseries_reconcile(
     if delta != 0 {
         crate::tdengine::RECONCILE_MISMATCHES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
+    if delta != 0 {
+        crate::tdengine::notify_reconcile_mismatch(
+            &query.vehicle_id,
+            &from,
+            &to,
+            pg.count,
+            td.count,
+            delta,
+        )
+        .await;
+    }
     let id = state
         .db
         .record_timeseries_reconciliation(&query.vehicle_id, &from, &to, pg.count, td.count, delta)
