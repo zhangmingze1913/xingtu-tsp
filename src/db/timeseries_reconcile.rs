@@ -170,7 +170,8 @@ impl Db {
             .query(
                 "UPDATE reconciliation_export_jobs
                  SET status = 'running', rows_written = 0, cursor_ts = NULL,
-                     cursor_id = NULL, file_path = NULL, error = NULL, updated_at = ?1
+                     cursor_id = NULL, lease_owner = NULL, lease_until = NULL,
+                     file_path = NULL, error = NULL, updated_at = ?1
                  WHERE id = ?2 AND status IN ('failed', 'cancelled')",
             )
             .bind(crate::util::now_iso())
@@ -192,6 +193,71 @@ impl Db {
             .execute(self.pool())
             .await?;
         Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn try_acquire_export_lease(
+        &self,
+        id: &str,
+        owner: &str,
+        now: &str,
+        until: &str,
+    ) -> AppResult<bool> {
+        let result = self
+            .query(
+                "UPDATE reconciliation_export_jobs
+                 SET lease_owner = ?1, lease_until = ?2
+                 WHERE id = ?3 AND status = 'running'
+                   AND (lease_owner IS NULL OR lease_until IS NULL
+                        OR lease_until < ?4 OR lease_owner = ?1)",
+            )
+            .bind(owner)
+            .bind(until)
+            .bind(id)
+            .bind(now)
+            .execute(self.pool())
+            .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn renew_export_lease(&self, id: &str, owner: &str, until: &str) -> AppResult<bool> {
+        let result = self
+            .query(
+                "UPDATE reconciliation_export_jobs SET lease_until = ?1
+                 WHERE id = ?2 AND lease_owner = ?3 AND status = 'running'",
+            )
+            .bind(until)
+            .bind(id)
+            .bind(owner)
+            .execute(self.pool())
+            .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn release_export_lease(&self, id: &str, owner: &str) -> AppResult<()> {
+        self.query(
+            "UPDATE reconciliation_export_jobs
+             SET lease_owner = NULL, lease_until = NULL
+             WHERE id = ?1 AND lease_owner = ?2",
+        )
+        .bind(id)
+        .bind(owner)
+        .execute(self.pool())
+        .await?;
+        Ok(())
+    }
+
+    pub async fn expired_export_job_ids(&self, now: &str) -> AppResult<Vec<String>> {
+        let rows = self
+            .query(
+                "SELECT id FROM reconciliation_export_jobs
+                 WHERE status = 'running'
+                   AND (lease_until IS NULL OR lease_until < ?1)
+                 ORDER BY created_at ASC LIMIT 100",
+            )
+            .bind(now)
+            .fetch_all(self.pool())
+            .await?;
+        Ok(rows.iter().map(|row| row.get::<String, _>(0)).collect())
     }
 
     pub async fn update_reconciliation_export_progress(
@@ -247,7 +313,8 @@ impl Db {
         let row = self
             .query(
                 "SELECT id, status, org_name, vehicle_id, consistent, max_rows,
-                        rows_written, cursor_ts, cursor_id, error, created_at, updated_at
+                        rows_written, cursor_ts, cursor_id, lease_owner, lease_until,
+                        error, created_at, updated_at
                  FROM reconciliation_export_jobs WHERE id = ?1",
             )
             .bind(id)
@@ -263,9 +330,11 @@ impl Db {
             rows_written: row.get::<i64, _>(6),
             cursor_ts: row.get::<Option<String>, _>(7),
             cursor_id: row.get::<Option<String>, _>(8),
-            error: row.get::<Option<String>, _>(9),
-            created_at: row.get::<String, _>(10),
-            updated_at: row.get::<String, _>(11),
+            lease_owner: row.get::<Option<String>, _>(9),
+            lease_until: row.get::<Option<String>, _>(10),
+            error: row.get::<Option<String>, _>(11),
+            created_at: row.get::<String, _>(12),
+            updated_at: row.get::<String, _>(13),
         }))
     }
 }
@@ -504,5 +573,55 @@ mod tests {
         assert_eq!(job.rows_written, 50);
         assert_eq!(job.cursor_ts.as_deref(), Some("2026-11-24T00:00:00Z"));
         assert_eq!(job.cursor_id.as_deref(), Some("row-50"));
+    }
+
+    #[tokio::test]
+    async fn export_lease_excludes_other_owners() {
+        let db = Db::in_memory().await.expect("db");
+        let id = db
+            .create_reconciliation_export_job("Org", None, None, 10)
+            .await
+            .expect("create");
+        let now = "2026-11-24T00:00:00Z";
+        let later = "2026-11-24T00:01:00Z";
+        assert!(db
+            .try_acquire_export_lease(&id, "a", now, later)
+            .await
+            .expect("acquire a"));
+        assert!(!db
+            .try_acquire_export_lease(&id, "b", now, later)
+            .await
+            .expect("acquire b"));
+        assert!(db
+            .renew_export_lease(&id, "a", "2026-11-24T00:02:00Z")
+            .await
+            .expect("renew"));
+        db.release_export_lease(&id, "a").await.expect("release");
+        assert!(db
+            .try_acquire_export_lease(&id, "b", now, later)
+            .await
+            .expect("acquire b"));
+    }
+
+    #[tokio::test]
+    async fn expired_export_jobs_are_recoverable() {
+        let db = Db::in_memory().await.expect("db");
+        let id = db
+            .create_reconciliation_export_job("Org", None, None, 10)
+            .await
+            .expect("create");
+        db.try_acquire_export_lease(
+            &id,
+            "worker",
+            "2026-11-24T00:00:00Z",
+            "2026-11-24T00:00:00Z",
+        )
+        .await
+        .expect("lease");
+        let ids = db
+            .expired_export_job_ids("2026-11-24T00:01:00Z")
+            .await
+            .expect("expired");
+        assert_eq!(ids, vec![id]);
     }
 }

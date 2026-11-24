@@ -191,12 +191,15 @@ fn spool_id(key: &str) -> String {
 mod tests {
     use super::*;
 
+    static TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
     fn temp_dir() -> PathBuf {
         std::env::temp_dir().join(format!("tsp-spool-{}", uuid::Uuid::new_v4()))
     }
 
     #[tokio::test]
     async fn spool_save_pending_and_remove_roundtrip() {
+        let _guard = TEST_LOCK.lock().await;
         let dir = temp_dir();
         let spool = ArchiveSpool::new(&dir).expect("spool");
         spool
@@ -228,6 +231,8 @@ mod tests {
 
     #[tokio::test]
     async fn spool_rejects_when_limit_exceeded() {
+        let _guard = TEST_LOCK.lock().await;
+        SPOOL_BYTES.store(0, Ordering::Relaxed);
         let dir = temp_dir();
         let spool = ArchiveSpool::new_with_limit(&dir, 10).expect("spool");
         spool

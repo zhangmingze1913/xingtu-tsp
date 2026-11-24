@@ -431,6 +431,11 @@
           "expr": "sum(increase(xingtu_reconcile_export_jobs_resumed_total[24h]))",
           "legendFormat": "resumed/24h",
           "refId": "F"
+        },
+        {
+          "expr": "sum(increase(xingtu_reconcile_export_jobs_recovered_total[24h]))",
+          "legendFormat": "recovered/24h",
+          "refId": "G"
         }
       ],
       "title": "Reconciliation export jobs / 24h",

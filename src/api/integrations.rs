@@ -604,6 +604,18 @@ async fn run_reconciliation_export_inner(
     if job.status == "cancelled" {
         return Ok(());
     }
+    let lease_owner = uuid::Uuid::new_v4().simple().to_string();
+    let now = chrono::Utc::now();
+    let now_text = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let lease_until =
+        (now + chrono::Duration::seconds(120)).to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    if !state
+        .db
+        .try_acquire_export_lease(id, &lease_owner, &now_text, &lease_until)
+        .await?
+    {
+        return Ok(());
+    }
     let final_path = format!("{dir}/{id}.csv");
     let mut written = job.rows_written.max(0);
     let mut cursor = match (job.cursor_ts.clone(), job.cursor_id.clone()) {
@@ -644,6 +656,7 @@ async fn run_reconciliation_export_inner(
             if current.status == "cancelled" {
                 drop(file);
                 let _ = tokio::fs::remove_file(&final_path).await;
+                let _ = state.db.release_export_lease(id, &lease_owner).await;
                 return Ok(());
             }
         }
@@ -682,6 +695,16 @@ async fn run_reconciliation_export_inner(
                 cursor.as_ref().map(|(_, row_id)| row_id.as_str()),
             )
             .await?;
+        let renew_until = (chrono::Utc::now() + chrono::Duration::seconds(120))
+            .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        if !state
+            .db
+            .renew_export_lease(id, &lease_owner, &renew_until)
+            .await?
+        {
+            tracing::warn!(job = %id, "export lease lost; stopping worker");
+            return Ok(());
+        }
         if page.len() < remaining as usize || written >= max_rows {
             break;
         }
@@ -704,6 +727,7 @@ async fn run_reconciliation_export_inner(
         .db
         .update_reconciliation_export_job(id, "completed", written, Some(&final_path), None)
         .await?;
+    let _ = state.db.release_export_lease(id, &lease_owner).await;
     crate::tdengine::EXPORT_JOBS_COMPLETED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     Ok(())
 }
@@ -878,4 +902,25 @@ pub async fn resume_reconciliation_export_job(
     Ok(Json(
         json!({"id": id, "status": "running", "resumed": true}),
     ))
+}
+
+pub(crate) async fn recover_export_job(state: AppState, id: String) {
+    let Ok(Some(job)) = state.db.get_reconciliation_export_job(&id).await else {
+        return;
+    };
+    if job.status != "running" {
+        return;
+    }
+    crate::tdengine::EXPORT_JOBS_RECOVERED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    tokio::spawn(async move {
+        run_reconciliation_export(
+            state,
+            id,
+            Some(job.org_name),
+            job.vehicle_id,
+            job.consistent,
+            job.max_rows,
+        )
+        .await;
+    });
 }

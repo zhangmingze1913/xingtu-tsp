@@ -421,7 +421,10 @@ POST body：
 - 重试前会覆盖旧 CSV，避免文件冲突
 - `running` 任务超过 `TSP_RECONCILE_EXPORT_STALE_SECS`（默认 60s）可手动 resume
 - resume 从持久化 `cursor_ts/cursor_id` 与 `rows_written` 继续追加，不重头导出
-- 进程重启后 running 任务不会自动恢复，需要调用 resume
+- 每个 worker 持有 120s 数据库租约，每页续租，防止多实例重复写
+- 每 30s 扫描过期租约并自动恢复 running 任务
+- 指标：`xingtu_reconcile_export_jobs_recovered_total`
+- 进程重启后任务也会由恢复扫描自动接管
 - 指标：`xingtu_reconcile_export_jobs_{started,completed,failed,cancelled}_total`
 - 进程重启时 `running` 任务不会自动恢复，需要重新提交
 - 已完成/失败任务默认保留 24 小时，每小时清理记录与文件

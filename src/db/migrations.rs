@@ -234,6 +234,16 @@ impl Db {
             "ALTER TABLE reconciliation_export_jobs ADD COLUMN cursor_id VARCHAR(64)",
         )
         .await?;
+        self.apply_migration(
+            "0026_reconciliation_export_lease",
+            "ALTER TABLE reconciliation_export_jobs ADD COLUMN lease_owner VARCHAR(64)",
+        )
+        .await?;
+        self.apply_migration(
+            "0027_reconciliation_export_lease_until",
+            "ALTER TABLE reconciliation_export_jobs ADD COLUMN lease_until VARCHAR(40)",
+        )
+        .await?;
         Ok(())
     }
 

@@ -143,6 +143,8 @@ pub struct ReconciliationExportJob {
     pub rows_written: i64,
     pub cursor_ts: Option<String>,
     pub cursor_id: Option<String>,
+    pub lease_owner: Option<String>,
+    pub lease_until: Option<String>,
     pub error: Option<String>,
     pub created_at: String,
     pub updated_at: String,

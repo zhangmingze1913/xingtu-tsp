@@ -81,6 +81,7 @@ pub async fn run(config: Config) -> AppResult<()> {
     spawn_tdengine_reconciler(state.clone());
     spawn_timeseries_history_pruner(state.clone());
     spawn_reconciliation_export_cleanup(state.clone());
+    spawn_reconciliation_export_recovery(state.clone());
 
     spawn_offline_sweeper(state.clone());
     spawn_retention_sweeper(state.clone());
@@ -210,6 +211,28 @@ pub(crate) fn spawn_jt808_kick_subscriber(cluster: &Cluster) {
                 "JT808 session moved; cancelling local connection"
             );
             jt808::cancel_terminal_session(phone);
+        }
+    });
+}
+
+fn spawn_reconciliation_export_recovery(state: AppState) {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(Duration::from_secs(30));
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        ticker.tick().await;
+        loop {
+            ticker.tick().await;
+            let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            match state.db.expired_export_job_ids(&now).await {
+                Ok(ids) => {
+                    for id in ids {
+                        crate::api::integrations::recover_export_job(state.clone(), id).await;
+                    }
+                }
+                Err(error) => {
+                    tracing::warn!(%error, "export recovery scan failed");
+                }
+            }
         }
     });
 }
