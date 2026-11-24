@@ -206,6 +206,8 @@ Authorization: Bearer <token>
 
 - 输入/选择 SIM 与通道
 - 调 `GET /api/media/archive` 列出对象
+- 按视频/音频过滤
+- 每页 20 条，上一页/下一页
 - “播放”调用归档回放接口，经 MSE 播放
 - “下载”带 Token 拉取原文件
 

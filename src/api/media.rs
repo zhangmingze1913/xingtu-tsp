@@ -37,6 +37,14 @@ channel <input id="channel" value="1" size="3">
 <video id="v" controls autoplay muted style="width:480px;background:#000"></video>
 <p>
 <button id="archiveList">归档列表</button>
+<select id="archiveFilter">
+<option value="">全部类型</option>
+<option value=".h264">视频 H.264</option>
+<option value=".aac">音频 AAC</option>
+</select>
+<button id="archivePrev" disabled>上一页</button>
+<span id="archivePage"></span>
+<button id="archiveNext" disabled>下一页</button>
 <span id="archiveStatus"></span>
 </p>
 <div id="archiveListBox" style="font-size:13px;line-height:1.8"></div>
@@ -183,11 +191,46 @@ function playArchive(key) {
   load('/api/media/archive/playback?key=' + encodeURIComponent(key), '归档回放');
 }
 
+let archiveObjects = [];
+let archivePage = 0;
+const ARCHIVE_PAGE_SIZE = 20;
+
+function archiveFiltered() {
+  const suffix = document.getElementById('archiveFilter').value;
+  return archiveObjects.filter((item) => !suffix || item.key.endsWith(suffix));
+}
+
+function renderArchivePage() {
+  const box = document.getElementById('archiveListBox');
+  const pageLabel = document.getElementById('archivePage');
+  const items = archiveFiltered();
+  const pages = Math.max(1, Math.ceil(items.length / ARCHIVE_PAGE_SIZE));
+  archivePage = Math.min(archivePage, pages - 1);
+  const start = archivePage * ARCHIVE_PAGE_SIZE;
+  const slice = items.slice(start, start + ARCHIVE_PAGE_SIZE);
+  box.innerHTML = '';
+  for (const item of slice) {
+    const row = document.createElement('div');
+    const name = document.createElement('span');
+    const stamp = item.modified_epoch ? new Date(item.modified_epoch * 1000).toLocaleString() + ' ' : '';
+    name.textContent = stamp + item.key + ' (' + formatBytes(item.size) + ') ';
+    const play = document.createElement('button');
+    play.textContent = '播放';
+    play.onclick = () => playArchive(item.key);
+    const download = document.createElement('button');
+    download.textContent = '下载';
+    download.onclick = () => downloadArchive(item.key);
+    row.append(name, play, download);
+    box.append(row);
+  }
+  pageLabel.textContent = ' 第 ' + (archivePage + 1) + '/' + pages + ' 页，共 ' + items.length + ' 条 ';
+  document.getElementById('archivePrev').disabled = archivePage === 0;
+  document.getElementById('archiveNext').disabled = archivePage >= pages - 1;
+}
+
 async function refreshArchive() {
   const { sim, channel } = currentTarget();
-  const box = document.getElementById('archiveListBox');
   const label = document.getElementById('archiveStatus');
-  box.innerHTML = '';
   label.textContent = '查询中...';
   try {
     const response = await fetch('/api/media/archive?sim=' + encodeURIComponent(sim) + '&channel=' + encodeURIComponent(channel), { cache: 'no-store', headers: authHeaders() });
@@ -198,29 +241,20 @@ async function refreshArchive() {
       return;
     }
     const data = await response.json();
-    const objects = (data.objects || []).slice().sort((a, b) => b.key.localeCompare(a.key));
-    label.textContent = objects.length + ' 个对象（最新在前）';
-    for (const item of objects) {
-      const row = document.createElement('div');
-      const name = document.createElement('span');
-      const stamp = item.modified_epoch ? new Date(item.modified_epoch * 1000).toLocaleString() + ' ' : '';
-      name.textContent = stamp + item.key + ' (' + formatBytes(item.size) + ') ';
-      const play = document.createElement('button');
-      play.textContent = '播放';
-      play.onclick = () => playArchive(item.key);
-      const download = document.createElement('button');
-      download.textContent = '下载';
-      download.onclick = () => downloadArchive(item.key);
-      row.append(name, play, download);
-      box.append(row);
-    }
-    if (data.objects.length === 0) { label.textContent = '暂无归档'; }
+    archiveObjects = (data.objects || []).slice().sort((a, b) => b.key.localeCompare(a.key));
+    archivePage = 0;
+    label.textContent = archiveObjects.length + ' 个对象（最新在前）';
+    renderArchivePage();
   } catch (e) {
     label.textContent = '归档查询失败';
   }
 }
 
 document.getElementById('archiveList').onclick = refreshArchive;
+document.getElementById('archiveFilter').onchange = () => { archivePage = 0; renderArchivePage(); };
+document.getElementById('archivePrev').onclick = () => { if (archivePage > 0) { archivePage -= 1; renderArchivePage(); } };
+document.getElementById('archiveNext').onclick = () => { archivePage += 1; renderArchivePage(); };
+
 </script>
 </body>
 </html>"#;
@@ -491,6 +525,8 @@ mod tests {
         assert!(PLAYER_HTML.contains("/api/media/archive"));
         assert!(PLAYER_HTML.contains("/api/media/archive/playback"));
         assert!(PLAYER_HTML.contains("archiveList"));
+        assert!(PLAYER_HTML.contains("archiveFilter"));
+        assert!(PLAYER_HTML.contains("archiveNext"));
         assert!(PLAYER_HTML.contains("/stream"));
         assert!(PLAYER_HTML.contains("id=\"stop\""));
         assert!(PLAYER_HTML.contains("avc1.42E01E"));
