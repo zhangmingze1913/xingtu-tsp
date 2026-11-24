@@ -1,6 +1,7 @@
 //! Media playback pipeline boundaries.
 
 pub mod archive;
+pub mod archive_spool;
 pub mod ffmpeg;
 pub mod hub;
 pub mod playback;

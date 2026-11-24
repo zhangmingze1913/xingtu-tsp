@@ -46,6 +46,8 @@ pub static PLAYBACK_SUCCESS: AtomicU64 = AtomicU64::new(0);
 pub static PLAYBACK_FAILURE: AtomicU64 = AtomicU64::new(0);
 pub static PLAYBACK_CACHE_HIT: AtomicU64 = AtomicU64::new(0);
 pub static PLAYBACK_CACHE_MISS: AtomicU64 = AtomicU64::new(0);
+pub static UPLOAD_SPOOLED: AtomicU64 = AtomicU64::new(0);
+pub static SPOOL_REPLAYED: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ArchiveStats {
@@ -58,6 +60,8 @@ pub struct ArchiveStats {
     pub playback_failure: u64,
     pub playback_cache_hit: u64,
     pub playback_cache_miss: u64,
+    pub upload_spooled: u64,
+    pub spool_replayed: u64,
 }
 
 pub fn stats() -> ArchiveStats {
@@ -71,6 +75,8 @@ pub fn stats() -> ArchiveStats {
         playback_failure: PLAYBACK_FAILURE.load(Ordering::Relaxed),
         playback_cache_hit: PLAYBACK_CACHE_HIT.load(Ordering::Relaxed),
         playback_cache_miss: PLAYBACK_CACHE_MISS.load(Ordering::Relaxed),
+        upload_spooled: UPLOAD_SPOOLED.load(Ordering::Relaxed),
+        spool_replayed: SPOOL_REPLAYED.load(Ordering::Relaxed),
     }
 }
 
@@ -242,6 +248,15 @@ impl RustFsArchive {
             }
         }
         UPLOAD_FAILURE.fetch_add(1, Ordering::Relaxed);
+        if let Some(spool) = crate::media::archive_spool::global() {
+            match spool.save(key, bytes, content_type).await {
+                Ok(()) => {
+                    UPLOAD_SPOOLED.fetch_add(1, Ordering::Relaxed);
+                    tracing::warn!(%key, "archive upload spooled for replay");
+                }
+                Err(error) => tracing::warn!(%error, %key, "archive spool write failed"),
+            }
+        }
         Err(last_error.unwrap_or_else(|| ArchiveError::S3("upload failed".to_string())))
     }
 
@@ -383,6 +398,30 @@ impl RustFsArchive {
         }
         Ok(())
     }
+}
+
+pub async fn replay_spool(
+    archive: &RustFsArchive,
+    spool: &crate::media::archive_spool::ArchiveSpool,
+) -> usize {
+    let Ok(items) = spool.pending().await else {
+        return 0;
+    };
+    let mut replayed = 0;
+    for item in items {
+        match archive.put(&item.key, item.bytes, &item.content_type).await {
+            Ok(()) => {
+                if spool.remove(&item.id).await.is_ok() {
+                    SPOOL_REPLAYED.fetch_add(1, Ordering::Relaxed);
+                    replayed += 1;
+                }
+            }
+            Err(error) => {
+                tracing::debug!(%error, key = %item.key, "archive spool replay deferred");
+            }
+        }
+    }
+    replayed
 }
 
 pub fn global() -> Option<&'static RustFsArchive> {

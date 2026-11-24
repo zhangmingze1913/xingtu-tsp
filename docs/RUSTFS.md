@@ -131,6 +131,8 @@ TSP_RUSTFS_RETENTION_DAYS=0
 TSP_RUSTFS_CLEANUP_INTERVAL_SECS=3600
 TSP_ARCHIVE_PLAYBACK_CACHE_ITEMS=8
 TSP_ARCHIVE_PLAYBACK_CACHE_BYTES=67108864
+TSP_ARCHIVE_SPOOL_DIR=data/archive-spool
+TSP_ARCHIVE_SPOOL_REPLAY_SECS=60
 ```
 
 `TSP_RUSTFS_ARCHIVE` 未开启时，录制和上传完全关闭，`MediaHub` 行为与之前一致。
@@ -166,6 +168,18 @@ media/{sim}/{channel}/YYYY/MM/DD/HHMMSS-{sequence}.aac
 - 启动后按 `TSP_RUSTFS_CLEANUP_INTERVAL_SECS` 周期执行
 - 没有 `LastModified` 的对象不会被删除
 - 只清理配置前缀下对象
+
+### 失败上传暂存与重放
+
+- 上传重试耗尽后，将 key/类型/内容写入 `TSP_ARCHIVE_SPOOL_DIR`
+- 每个对象两个文件：`<sha256>.json` 元数据 + `<sha256>.bin` 内容
+- 元数据最后写入，作为完成标记
+- 后台每 `TSP_ARCHIVE_SPOOL_REPLAY_SECS` 秒扫描并重试
+- 成功后删除暂存文件
+- 暂存目录设为 `off` 可关闭
+- 指标：`xingtu_archive_upload_spooled_total`、`xingtu_archive_spool_replayed_total`
+
+注意：K8s 默认使用 `/tmp/archive-spool`，Pod 重建会丢失；生产应挂载持久卷或改用对象存储队列。
 
 ### 回放缓存
 
@@ -262,6 +276,8 @@ src/lib.rs             启动时确保桶存在
 - `video_segments_start_at_keyframes`
 - `cache_is_lru_by_item_count`
 - `cache_evicts_by_bytes_and_skips_oversize`
+- `spool_save_pending_and_remove_roundtrip`
+- `spool_id_is_stable_and_path_safe`
 - `render_includes_archive_counters`
 - `archive_put_list_get_against_s3_mock`：真实 S3 客户端对 mock 发起 PUT/GET/ListObjectsV2
 

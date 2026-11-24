@@ -76,6 +76,7 @@ pub async fn run(config: Config) -> AppResult<()> {
         });
     }
     spawn_archive_cleanup();
+    spawn_archive_spool_replay();
 
     spawn_offline_sweeper(state.clone());
     spawn_retention_sweeper(state.clone());
@@ -205,6 +206,27 @@ pub(crate) fn spawn_jt808_kick_subscriber(cluster: &Cluster) {
                 "JT808 session moved; cancelling local connection"
             );
             jt808::cancel_terminal_session(phone);
+        }
+    });
+}
+
+fn spawn_archive_spool_replay() {
+    let Some(archive) = crate::media::archive::global().cloned() else {
+        return;
+    };
+    let Some(spool) = crate::media::archive_spool::global().cloned() else {
+        return;
+    };
+    let interval = Duration::from_secs(crate::media::archive_spool::replay_interval_seconds());
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(interval);
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            ticker.tick().await;
+            let replayed = crate::media::archive::replay_spool(&archive, &spool).await;
+            if replayed > 0 {
+                tracing::info!(replayed, "archive spool replay completed");
+            }
         }
     });
 }
