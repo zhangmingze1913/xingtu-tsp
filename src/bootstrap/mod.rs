@@ -17,6 +17,7 @@ mod validate;
 pub(crate) async fn bootstrap(config: &Config) -> AppResult<AppState> {
     validate::cluster(config)?;
     validate::security(config)?;
+    validate::timeseries(config)?;
 
     let db = Db::open_with_postgis(&config.database_url, config.postgis_enabled).await?;
     let seeded = seed_database(config, &db).await?;
@@ -78,16 +79,26 @@ pub(crate) async fn bootstrap(config: &Config) -> AppResult<AppState> {
     };
     builder = builder.tsink(tsink);
 
-    let tdengine = if let Some(url) = config.tdengine_url.as_deref() {
-        Some(
-            crate::tdengine::TdengineStore::start(
-                url.to_string(),
-                config.tdengine_user.clone(),
-                config.tdengine_password.clone(),
-                config.tdengine_database.clone(),
-            )
-            .await?,
+    let tdengine = if config.timeseries_backend.uses_tdengine() {
+        let url = config
+            .tdengine_url
+            .clone()
+            .ok_or_else(|| AppError::internal("TSP_TDENGINE_URL 未设置"))?;
+        match crate::tdengine::TdengineStore::start(
+            url,
+            config.tdengine_user.clone(),
+            config.tdengine_password.clone(),
+            config.tdengine_database.clone(),
         )
+        .await
+        {
+            Ok(store) => Some(store),
+            Err(error) if config.timeseries_backend == crate::config::TimeSeriesBackend::Dual => {
+                tracing::warn!(%error, "TDengine unavailable in dual mode; PostgreSQL only");
+                None
+            }
+            Err(error) => return Err(error),
+        }
     } else {
         None
     };

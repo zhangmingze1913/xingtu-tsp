@@ -37,27 +37,34 @@ pub async fn trajectory(
         .unwrap_or_else(|| crate::util::iso_from_now_minutes(-120));
     let to = query.to.unwrap_or_else(crate::util::now_iso);
 
+    Ok(Json(load_trajectory(&state, &id, &from, &to, limit).await?))
+}
+
+async fn load_trajectory(
+    state: &AppState,
+    id: &str,
+    from: &str,
+    to: &str,
+    limit: i64,
+) -> AppResult<Vec<TelemetryPoint>> {
     if let Some(tsink) = &state.tsink {
-        match tsink.query(&id, &from, &to, limit).await {
-            Ok(points) if !points.is_empty() => return Ok(Json(points)),
+        match tsink.query(id, from, to, limit).await {
+            Ok(points) if !points.is_empty() => return Ok(points),
             Ok(_) => {}
             Err(error) => tracing::warn!(%error, vehicle = %id, "tsink trajectory fallback"),
         }
     }
     if let Some(tdengine) = &state.tdengine {
-        match tdengine.query(&id, &from, &to, limit).await {
-            Ok(points) if !points.is_empty() => return Ok(Json(points)),
+        match tdengine.query(id, from, to, limit).await {
+            Ok(points) if !points.is_empty() => return Ok(points),
             Ok(_) => {}
             Err(error) => tracing::warn!(%error, vehicle = %id, "TDengine trajectory fallback"),
         }
     }
-
-    Ok(Json(
-        state
-            .db
-            .trajectory(&id, Some(from), Some(to), limit)
-            .await?,
-    ))
+    state
+        .db
+        .trajectory(id, Some(from.to_string()), Some(to.to_string()), limit)
+        .await
 }
 
 pub async fn trajectory_export(
@@ -72,10 +79,7 @@ pub async fn trajectory_export(
         .from
         .unwrap_or_else(|| crate::util::iso_from_now_minutes(-120));
     let to = query.to.unwrap_or_else(crate::util::now_iso);
-    let points = state
-        .db
-        .trajectory(&id, Some(from), Some(to), limit)
-        .await?;
+    let points = load_trajectory(&state, &id, &from, &to, limit).await?;
     let mut csv = String::from("ts,lat,lon,speed,heading,ignition,soc,odometer_km,source\n");
     for point in points {
         csv.push_str(&format!(

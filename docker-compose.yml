@@ -13,6 +13,8 @@ services:
       TSP_DATABASE: /data/tsp.db
       TSP_JWT_SECRET: change-me-in-production
       TSP_DEMO_MODE: "true"
+      TSP_TIMESERIES_BACKEND: ${TSP_TIMESERIES_BACKEND:-postgres}
+      TSP_TDENGINE_URL: ${TSP_TDENGINE_URL:-}
       TSP_MEDIA_UDP_ADDR: 0.0.0.0:19000
       TSP_RUSTFS_ARCHIVE: "true"
       TSP_RUSTFS_ENDPOINT: http://rustfs:9000
@@ -39,6 +41,27 @@ services:
         condition: service_healthy
     volumes:
       - tsp-data:/data
+    restart: unless-stopped
+
+  # Optional TDengine 3.x for larger trajectories. Enable with:
+  #   docker compose --profile tdengine up -d
+  tdengine:
+    image: tdengine/tdengine:3.3.6.0
+    container_name: xingtu-tdengine
+    profiles: ["tdengine"]
+    ports:
+      - "6030:6030"
+      - "6041:6041"
+    environment:
+      TAOS_FQDN: tdengine
+    volumes:
+      - tdengine-data:/var/lib/taos
+      - tdengine-log:/var/log/taos
+    healthcheck:
+      test: ["CMD-SHELL", "taos -s 'show databases' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
     restart: unless-stopped
 
   # S3-compatible object storage for recorded 1078 media.
@@ -101,3 +124,5 @@ volumes:
   rustfs-data-2:
   rustfs-data-3:
   rustfs-logs:
+  tdengine-data:
+  tdengine-log:

@@ -39,6 +39,8 @@ services:
       TSP_JWT_SECRET: local-cluster-secret-change-me
       TSP_NODE_ID: api-a
       TSP_NODE_ROLE: api
+      TSP_TIMESERIES_BACKEND: ${TSP_TIMESERIES_BACKEND:-postgres}
+      TSP_TDENGINE_URL: ${TSP_TDENGINE_URL:-}
       TSP_MEDIA_UDP_ADDR: 0.0.0.0:19000
       TSP_RUSTFS_ARCHIVE: "true"
       TSP_RUSTFS_ENDPOINT: http://rustfs:9000
@@ -124,6 +126,21 @@ services:
       - gateway-a
       - gateway-b
 
+  # Optional TDengine 3.x. Enable with --profile tdengine.
+  tdengine:
+    image: tdengine/tdengine:3.3.6.0
+    profiles: ["tdengine"]
+    environment:
+      TAOS_FQDN: tdengine
+    volumes:
+      - tdengine-data:/var/lib/taos
+      - tdengine-log:/var/log/taos
+    healthcheck:
+      test: ["CMD-SHELL", "taos -s 'show databases' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   # S3-compatible object storage for recorded 1078 media.
   rustfs:
     image: rustfs/rustfs:latest
@@ -182,3 +199,5 @@ volumes:
   rustfs-data-2:
   rustfs-data-3:
   rustfs-logs:
+  tdengine-data:
+  tdengine-log:

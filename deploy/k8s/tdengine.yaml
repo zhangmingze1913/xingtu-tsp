@@ -1,0 +1,96 @@
+# Optional TDengine 3.x for large trajectory workloads.
+#
+# Not part of the default Kustomization: apply it explicitly, then set
+# TSP_TIMESERIES_BACKEND=tdengine and
+# TSP_TDENGINE_URL=http://tdengine:6041 in tsp-config.
+#
+# For production use the TDengine Operator / Helm chart and a 3-node cluster;
+# this single-node manifest is for staging and scale evaluation.
+apiVersion: v1
+kind: Service
+metadata:
+  name: tdengine
+  namespace: xingtu-tsp
+  labels:
+    app: tdengine
+spec:
+  clusterIP: None
+  selector:
+    app: tdengine
+  ports:
+    - name: native
+      port: 6030
+      targetPort: 6030
+    - name: rest
+      port: 6041
+      targetPort: 6041
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: tdengine
+  namespace: xingtu-tsp
+  labels:
+    app: tdengine
+spec:
+  serviceName: tdengine
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tdengine
+  template:
+    metadata:
+      labels:
+        app: tdengine
+    spec:
+      containers:
+        - name: tdengine
+          image: tdengine/tdengine:3.3.6.0
+          ports:
+            - name: native
+              containerPort: 6030
+            - name: rest
+              containerPort: 6041
+          env:
+            - name: TAOS_FQDN
+              value: tdengine
+          readinessProbe:
+            tcpSocket:
+              port: 6041
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            tcpSocket:
+              port: 6030
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "4"
+              memory: 8Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/taos
+            - name: log
+              mountPath: /var/log/taos
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 20Gi
+    - metadata:
+        name: log
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi

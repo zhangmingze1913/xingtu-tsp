@@ -416,6 +416,8 @@ pub struct HealthResponse {
     pub database: bool,
     pub cluster_enabled: bool,
     pub cluster_leader: bool,
+    pub timeseries_backend: String,
+    pub tdengine: bool,
     pub timestamp: String,
 }
 

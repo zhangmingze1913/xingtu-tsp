@@ -3,6 +3,40 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// Time-series backend selected at deployment time.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TimeSeriesBackend {
+    /// PostgreSQL/PostGIS only (small and medium deployments).
+    Postgres,
+    /// TDengine is the query store; PostgreSQL remains authoritative.
+    Tdengine,
+    /// Write PG and TDengine, query TDengine first (migration/large).
+    Dual,
+}
+
+impl TimeSeriesBackend {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "postgres" | "postgresql" | "pg" => Some(Self::Postgres),
+            "tdengine" | "taos" => Some(Self::Tdengine),
+            "dual" | "both" => Some(Self::Dual),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Postgres => "postgres",
+            Self::Tdengine => "tdengine",
+            Self::Dual => "dual",
+        }
+    }
+
+    pub fn uses_tdengine(self) -> bool {
+        !matches!(self, Self::Postgres)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub bind: String,
@@ -49,6 +83,10 @@ pub struct Config {
     pub tdengine_user: String,
     pub tdengine_password: String,
     pub tdengine_database: String,
+    /// Explicit time-series backend selection.
+    pub timeseries_backend: TimeSeriesBackend,
+    /// Raw env value, kept for startup validation.
+    pub timeseries_backend_raw: String,
     /// Optional Walrus distributed-log TCP endpoint.
     pub walrus_addr: Option<String>,
     pub walrus_topic: String,
@@ -119,6 +157,18 @@ impl Config {
             .and_then(|value| value.parse().ok())
             .unwrap_or_else(|| stable_node_id(&node_id));
 
+        let tdengine_url = env::var("TSP_TDENGINE_URL").ok().filter(|v| !v.is_empty());
+        let timeseries_backend_raw = env::var("TSP_TIMESERIES_BACKEND").unwrap_or_default();
+        let timeseries_backend = if timeseries_backend_raw.trim().is_empty() {
+            if tdengine_url.is_some() {
+                TimeSeriesBackend::Dual
+            } else {
+                TimeSeriesBackend::Postgres
+            }
+        } else {
+            TimeSeriesBackend::parse(&timeseries_backend_raw).unwrap_or(TimeSeriesBackend::Postgres)
+        };
+
         Self {
             bind: env::var("TSP_BIND").unwrap_or_else(|_| "127.0.0.1:8090".to_string()),
             database_url,
@@ -172,12 +222,14 @@ impl Config {
             iggy_password: env::var("TSP_IGGY_PASSWORD").unwrap_or_else(|_| "iggy".to_string()),
             tsink_url: env::var("TSP_TSINK_URL").ok().filter(|v| !v.is_empty()),
             tsink_token: env::var("TSP_TSINK_TOKEN").ok().filter(|v| !v.is_empty()),
-            tdengine_url: env::var("TSP_TDENGINE_URL").ok().filter(|v| !v.is_empty()),
+            tdengine_url,
             tdengine_user: env::var("TSP_TDENGINE_USER").unwrap_or_else(|_| "root".to_string()),
             tdengine_password: env::var("TSP_TDENGINE_PASSWORD")
                 .unwrap_or_else(|_| "taosdata".to_string()),
             tdengine_database: env::var("TSP_TDENGINE_DATABASE")
                 .unwrap_or_else(|_| "tsp".to_string()),
+            timeseries_backend,
+            timeseries_backend_raw,
             walrus_addr: env::var("TSP_WALRUS_ADDR").ok().filter(|v| !v.is_empty()),
             walrus_topic: env::var("TSP_WALRUS_TOPIC").unwrap_or_else(|_| "tsp-events".to_string()),
             raft_enabled: env::var("TSP_RAFT_ENABLED")
@@ -332,5 +384,25 @@ mod tests {
             sqlite_path_from("mariadb://user:pw@db:3306/tsp"),
             PathBuf::new()
         );
+    }
+
+    #[test]
+    fn parses_time_series_backends() {
+        assert_eq!(
+            TimeSeriesBackend::parse("postgres"),
+            Some(TimeSeriesBackend::Postgres)
+        );
+        assert_eq!(
+            TimeSeriesBackend::parse("TAOS"),
+            Some(TimeSeriesBackend::Tdengine)
+        );
+        assert_eq!(
+            TimeSeriesBackend::parse("both"),
+            Some(TimeSeriesBackend::Dual)
+        );
+        assert_eq!(TimeSeriesBackend::parse("unknown"), None);
+        assert!(!TimeSeriesBackend::Postgres.uses_tdengine());
+        assert!(TimeSeriesBackend::Tdengine.uses_tdengine());
+        assert_eq!(TimeSeriesBackend::Dual.as_str(), "dual");
     }
 }

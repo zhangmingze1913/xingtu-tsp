@@ -9,7 +9,13 @@ use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
-use xingtu_tsp::{auth::hash_password, build_app, config::Config, db::Db, state::AppState};
+use xingtu_tsp::{
+    auth::hash_password,
+    build_app,
+    config::{Config, TimeSeriesBackend},
+    db::Db,
+    state::AppState,
+};
 
 pub fn test_config() -> Config {
     Config {
@@ -42,6 +48,8 @@ pub fn test_config() -> Config {
         tdengine_user: "root".to_string(),
         tdengine_password: "taosdata".to_string(),
         tdengine_database: "tsp".to_string(),
+        timeseries_backend: TimeSeriesBackend::Postgres,
+        timeseries_backend_raw: String::new(),
         walrus_addr: None,
         walrus_topic: "tsp-events".to_string(),
         raft_enabled: false,

@@ -11,6 +11,8 @@ pub(crate) async fn health(State(state): State<AppState>) -> impl IntoResponse {
         database,
         cluster_enabled: cluster.enabled,
         cluster_leader: cluster.leader,
+        timeseries_backend: state.config.timeseries_backend.as_str().to_string(),
+        tdengine: state.tdengine.is_some(),
         timestamp: now_iso(),
     };
     let status = if database {
@@ -37,6 +39,8 @@ pub(crate) async fn ready(State(state): State<AppState>) -> impl IntoResponse {
             "database": database,
             "cluster_enabled": cluster.enabled,
             "cluster_leader": cluster.leader,
+            "timeseries_backend": state.config.timeseries_backend.as_str(),
+            "tdengine": state.tdengine.is_some(),
         })),
     )
 }

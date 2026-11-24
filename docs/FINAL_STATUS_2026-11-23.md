@@ -6,7 +6,7 @@
 ## 1. 验证结果
 
 ```text
-lib                    239 passed
+lib                    242 passed
 integration            32 passed
 fmt                    clean
 clippy                 clean
@@ -228,7 +228,7 @@ NotApplicable    7
 验证：
 
 ```text
-lib                    239 passed
+lib                    242 passed
 integration            32 passed
 fmt                    clean
 clippy -D warnings     clean
@@ -283,4 +283,32 @@ prefix_and_segment_limits_have_safe_defaults
 ```
 
 未验证：真实 RustFS 容器、真实 1078 终端、断点/限流/大文件/并发上传、归档 raw 的浏览器回放。
+
+## 10. 时序后端选择（TDengine）
+
+新增 `TSP_TIMESERIES_BACKEND`：
+
+```text
+postgres  小/中型，PostgreSQL/PostGIS
+tdengine  大型，TDengine 查询 + PG 权威
+dual      迁移期双写，查询优先 TDengine
+```
+
+- 配置/启动校验：`tdengine` 必须成功初始化，`dual` 失败降级 PG
+- 健康检查输出 `timeseries_backend` 与 `tdengine`
+- 轨迹查询：tsink（可选）→ TDengine → PostgreSQL
+- 轨迹导出使用同一后端选择
+- Compose profile：`--profile tdengine`
+- K8s 可选清单：`deploy/k8s/tdengine.yaml`
+- 文档：[TIMESERIES_BACKENDS.md](TIMESERIES_BACKENDS.md)
+
+测试：
+
+```text
+config::tests::parses_time_series_backends
+tdengine::tests::parses_timestamps_and_identifiers
+tdengine::tests::rest_query_maps_rows_to_points
+```
+
+真实 TDengine 容器未运行；REST 适配器已用 mock 验证。
 

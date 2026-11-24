@@ -38,7 +38,7 @@
 | Apache Iggy | HTTP adapter（无 Rust SDK） | 可选持久事件日志 | 可选 |
 | Walrus | 自定义 TCP adapter | 可选下游归档日志 | 可选，不建议默认 |
 | tsink | HTTP adapter | 可选 Prometheus 风格轨迹存储 | 可选 |
-| TDengine | REST SQL adapter | 可选时序轨迹库 | 可选 |
+| TDengine | REST SQL adapter | 可选时序轨迹库 | 按体量可选（10万+） |
 | jsonwebtoken | 9.3.1 | JWT 签发/校验 | 主栈 |
 | Argon2 | 0.5.3 | 密码哈希 | 主栈 |
 | Reqwest | 0.12.28（native-tls） | Iggy/TDengine/tsink/Raft HTTP | 主栈/可选适配 |

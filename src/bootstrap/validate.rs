@@ -1,8 +1,27 @@
 use crate::{
-    config::Config,
+    config::{Config, TimeSeriesBackend},
     db::Db,
     error::{AppError, AppResult},
 };
+
+pub(super) fn timeseries(config: &Config) -> AppResult<()> {
+    if !config.timeseries_backend_raw.trim().is_empty()
+        && TimeSeriesBackend::parse(&config.timeseries_backend_raw).is_none()
+    {
+        return Err(AppError::internal(
+            "TSP_TIMESERIES_BACKEND 只能是 postgres / tdengine / dual",
+        ));
+    }
+    if config.timeseries_backend.uses_tdengine() && config.tdengine_url.is_none() {
+        return Err(AppError::internal(
+            "TSP_TIMESERIES_BACKEND=tdengine/dual 需要 TSP_TDENGINE_URL",
+        ));
+    }
+    if config.timeseries_backend == TimeSeriesBackend::Postgres && config.tdengine_url.is_some() {
+        tracing::info!("TSP_TDENGINE_URL is set but backend is postgres; TDengine is disabled");
+    }
+    Ok(())
+}
 
 pub(super) fn security(config: &Config) -> AppResult<()> {
     if !matches!(

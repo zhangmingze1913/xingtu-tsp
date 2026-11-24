@@ -55,6 +55,9 @@ data:
   # Optional tsink time-series store (Prometheus-compatible HTTP)
   TSP_TSINK_URL: ""
   TSP_TSINK_TOKEN: ""
+  # Time-series backend: postgres | tdengine | dual.
+  # Set to tdengine/dual and set TSP_TDENGINE_URL after applying tdengine.yaml.
+  TSP_TIMESERIES_BACKEND: "postgres"
   # Optional TDengine REST SQL (taosAdapter)
   TSP_TDENGINE_URL: ""
   TSP_TDENGINE_USER: "root"

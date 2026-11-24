@@ -274,3 +274,67 @@ fn sanitize_identifier(value: &str) -> String {
         out
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_timestamps_and_identifiers() {
+        assert_eq!(
+            parse_timestamp(&serde_json::json!(1_700_000_000)),
+            Some(1_700_000_000_000)
+        );
+        assert_eq!(
+            parse_timestamp(&serde_json::json!(1_700_000_000_000i64)),
+            Some(1_700_000_000_000)
+        );
+        let text = "2026-11-24T08:00:00Z";
+        let expected = DateTime::parse_from_rfc3339(text)
+            .unwrap()
+            .timestamp_millis();
+        assert_eq!(parse_timestamp(&serde_json::json!(text)), Some(expected));
+        assert_eq!(sanitize_identifier("v_沪A 123"), "v__A_123");
+        assert_eq!(escape_sql("a'b\\c"), "a''b\\\\c");
+    }
+
+    #[tokio::test]
+    async fn rest_query_maps_rows_to_points() {
+        use axum::{routing::post, Router};
+
+        async fn sql(body: String) -> axum::Json<serde_json::Value> {
+            if body.trim_start().starts_with("SELECT") {
+                axum::Json(serde_json::json!({
+                    "code": 0,
+                    "data": [[1_700_000_000_000i64, 31.2, 121.4, 50.0, 90.0, true, 80.0, 100.0]]
+                }))
+            } else {
+                axum::Json(serde_json::json!({"code": 0}))
+            }
+        }
+
+        let app = Router::new().route("/rest/sql", post(sql));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        let store = TdengineStore::start(
+            format!("http://{addr}"),
+            "root".to_string(),
+            "taosdata".to_string(),
+            "tsp".to_string(),
+        )
+        .await
+        .expect("store");
+        let points = store
+            .query("veh-1", "2026-11-24T00:00:00Z", "2026-11-25T00:00:00Z", 10)
+            .await
+            .expect("query");
+        assert_eq!(points.len(), 1);
+        assert_eq!(points[0].source, "tdengine");
+        assert!((points[0].lat - 31.2).abs() < f64::EPSILON);
+    }
+}
