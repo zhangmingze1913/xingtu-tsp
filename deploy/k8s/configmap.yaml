@@ -63,6 +63,8 @@ data:
   TSP_TDENGINE_USER: "root"
   TSP_TDENGINE_PASSWORD: "taosdata"
   TSP_TDENGINE_DATABASE: "tsp"
+  TSP_TDENGINE_QUEUE_CAPACITY: "8192"
+  TSP_TDENGINE_WRITE_RETRIES: "3"
   # Optional Walrus durable event archive (length-prefixed TCP)
   TSP_WALRUS_ADDR: ""
   TSP_WALRUS_TOPIC: "tsp-events"

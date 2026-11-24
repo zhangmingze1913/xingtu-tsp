@@ -194,6 +194,41 @@ impl Metrics {
             "xingtu_archive_playback_cache_miss_total {}\n",
             archive.playback_cache_miss
         ));
+        let tdengine = crate::tdengine::stats();
+        out.push_str("# HELP xingtu_tdengine_writes_total TDengine samples written.\n");
+        out.push_str("# TYPE xingtu_tdengine_writes_total counter\n");
+        out.push_str(&format!(
+            "xingtu_tdengine_writes_total {}\n",
+            tdengine.writes
+        ));
+        out.push_str(
+            "# HELP xingtu_tdengine_failures_total TDengine writes failed after retries.\n",
+        );
+        out.push_str("# TYPE xingtu_tdengine_failures_total counter\n");
+        out.push_str(&format!(
+            "xingtu_tdengine_failures_total {}\n",
+            tdengine.failures
+        ));
+        out.push_str("# HELP xingtu_tdengine_retries_total TDengine write retry attempts.\n");
+        out.push_str("# TYPE xingtu_tdengine_retries_total counter\n");
+        out.push_str(&format!(
+            "xingtu_tdengine_retries_total {}\n",
+            tdengine.retries
+        ));
+        out.push_str(
+            "# HELP xingtu_tdengine_dropped_total TDengine samples dropped on a full queue.\n",
+        );
+        out.push_str("# TYPE xingtu_tdengine_dropped_total counter\n");
+        out.push_str(&format!(
+            "xingtu_tdengine_dropped_total {}\n",
+            tdengine.dropped
+        ));
+        out.push_str("# HELP xingtu_tdengine_queue_depth TDengine write queue depth.\n");
+        out.push_str("# TYPE xingtu_tdengine_queue_depth gauge\n");
+        out.push_str(&format!(
+            "xingtu_tdengine_queue_depth {}\n",
+            tdengine.queue_depth
+        ));
         out.push_str("# HELP xingtu_cluster_leader Whether this node owns scheduler leadership.\n");
         out.push_str("# TYPE xingtu_cluster_leader gauge\n");
         out.push_str(&format!(
@@ -242,5 +277,7 @@ mod tests {
         assert!(text.contains("xingtu_archive_playback_failure_total"));
         assert!(text.contains("xingtu_archive_playback_cache_hit_total"));
         assert!(text.contains("xingtu_archive_spool_pending"));
+        assert!(text.contains("xingtu_tdengine_writes_total"));
+        assert!(text.contains("xingtu_tdengine_queue_depth"));
     }
 }

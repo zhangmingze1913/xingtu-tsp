@@ -63,6 +63,8 @@ TSP_TDENGINE_URL=http://tdengine:6041
 TSP_TDENGINE_USER=root
 TSP_TDENGINE_PASSWORD=taosdata
 TSP_TDENGINE_DATABASE=tsp
+TSP_TDENGINE_QUEUE_CAPACITY=8192
+TSP_TDENGINE_WRITE_RETRIES=3
 ```
 
 `TSP_TDENGINE_URL` 必须是 taosAdapter 的 HTTP 地址，不是原生 6030 端口。
@@ -148,7 +150,23 @@ v_<sanitized_vehicle_id>
 
 查询使用标签过滤 + 时间范围 + LIMIT，避免全表扫描。
 
-## 7. 一致性与限制
+## 7. 写入可靠性与指标
+
+- 有界队列：`TSP_TDENGINE_QUEUE_CAPACITY`（默认 8192）
+- 队列满：丢弃最新样本并告警，不阻塞 1078 接收
+- 单条写入失败：最多重试 `TSP_TDENGINE_WRITE_RETRIES` 次，指数退避
+- 重试耗尽：记录失败指标
+- 指标：
+
+```text
+xingtu_tdengine_writes_total
+xingtu_tdengine_failures_total
+xingtu_tdengine_retries_total
+xingtu_tdengine_dropped_total
+xingtu_tdengine_queue_depth
+```
+
+## 8. 一致性与限制
 
 当前实现：
 
@@ -172,13 +190,14 @@ TDengine = 可重建的查询加速副本
 - TDengine 写入延迟与失败指标
 - 保留策略与磁盘容量规划
 
-## 8. 测试
+## 9. 测试
 
 代码侧测试：
 
 ```text
 tdengine::tests::parses_timestamps_and_identifiers
 tdengine::tests::rest_query_maps_rows_to_points
+tdengine::tests::write_retries_transient_failures
 config::tests::parses_time_series_backends
 ```
 

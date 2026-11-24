@@ -10,6 +10,8 @@
 //!   TSP_TDENGINE_PASSWORD=taosdata
 //!   TSP_TDENGINE_DATABASE=tsp
 
+use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
+
 use chrono::{DateTime, Utc};
 use reqwest::Client;
 use serde_json::Value;
@@ -20,9 +22,34 @@ use crate::{
     models::{IngestOutcome, TelemetryPoint},
 };
 
+pub static WRITES: AtomicU64 = AtomicU64::new(0);
+pub static FAILURES: AtomicU64 = AtomicU64::new(0);
+pub static RETRIES: AtomicU64 = AtomicU64::new(0);
+pub static DROPPED: AtomicU64 = AtomicU64::new(0);
+pub static QUEUE_DEPTH: AtomicI64 = AtomicI64::new(0);
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TdengineStats {
+    pub writes: u64,
+    pub failures: u64,
+    pub retries: u64,
+    pub dropped: u64,
+    pub queue_depth: i64,
+}
+
+pub fn stats() -> TdengineStats {
+    TdengineStats {
+        writes: WRITES.load(Ordering::Relaxed),
+        failures: FAILURES.load(Ordering::Relaxed),
+        retries: RETRIES.load(Ordering::Relaxed),
+        dropped: DROPPED.load(Ordering::Relaxed),
+        queue_depth: QUEUE_DEPTH.load(Ordering::Relaxed),
+    }
+}
+
 #[derive(Clone)]
 pub struct TdengineStore {
-    sender: mpsc::UnboundedSender<Sample>,
+    sender: mpsc::Sender<Sample>,
     client: Client,
     base: String,
     user: String,
@@ -65,49 +92,52 @@ impl TdengineStore {
                 AppError::internal("TDengine HTTP 客户端初始化失败")
             })?;
 
-        let init = Self {
-            sender: mpsc::unbounded_channel().0,
-            client: client.clone(),
-            base: base.clone(),
-            user: user.clone(),
-            password: password.clone(),
-            database: database.clone(),
-        };
-        init.exec(&format!("CREATE DATABASE IF NOT EXISTS `{database}`"))
-            .await?;
-        init.exec(&format!(
-            "CREATE STABLE IF NOT EXISTS `{database}`.`telemetry` (\
-             ts TIMESTAMP, lat DOUBLE, lon DOUBLE, speed DOUBLE, heading DOUBLE, \
-             ignition BOOL, soc DOUBLE, odometer DOUBLE\
-             ) TAGS (vehicle_id NCHAR(64))"
-        ))
-        .await?;
-        tracing::info!(url = %base, database = %database, "TDengine trajectory store enabled");
-
-        let (sender, mut receiver) = mpsc::unbounded_channel::<Sample>();
-        let writer = Self {
-            sender: mpsc::unbounded_channel().0,
+        let capacity = std::env::var("TSP_TDENGINE_QUEUE_CAPACITY")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|value| *value >= 64)
+            .unwrap_or(8192);
+        let (sender, mut receiver) = mpsc::channel::<Sample>(capacity);
+        let store = Self {
+            sender,
             client,
             base,
             user,
             password,
             database,
         };
+        store
+            .exec(&format!(
+                "CREATE DATABASE IF NOT EXISTS `{}`",
+                store.database
+            ))
+            .await?;
+        store
+            .exec(&format!(
+                "CREATE STABLE IF NOT EXISTS `{}`.`telemetry` (\
+                 ts TIMESTAMP, lat DOUBLE, lon DOUBLE, speed DOUBLE, heading DOUBLE, \
+                 ignition BOOL, soc DOUBLE, odometer DOUBLE\
+                 ) TAGS (vehicle_id NCHAR(64))",
+                store.database
+            ))
+            .await?;
+        tracing::info!(url = %store.base, database = %store.database, "TDengine trajectory store enabled");
+
+        let writer = store.clone();
         tokio::spawn(async move {
             while let Some(sample) = receiver.recv().await {
-                if let Err(error) = writer.write_sample(&sample).await {
-                    tracing::warn!(%error, vehicle = %sample.vehicle_id, "TDengine write failed");
-                }
+                QUEUE_DEPTH.fetch_sub(1, Ordering::Relaxed);
+                writer.write_sample_with_retry(&sample).await;
             }
         });
-        Ok(Self { sender, ..init })
+        Ok(store)
     }
 
-    pub fn enqueue(&self, outcome: &IngestOutcome) {
+    pub fn enqueue(&self, outcome: &IngestOutcome) -> bool {
         let Ok(ts) = DateTime::parse_from_rfc3339(&outcome.ts) else {
-            return;
+            return false;
         };
-        let _ = self.sender.send(Sample {
+        let sample = Sample {
             vehicle_id: outcome.vehicle_id.clone(),
             ts_ms: ts.timestamp_millis(),
             lat: outcome.lat,
@@ -117,7 +147,18 @@ impl TdengineStore {
             ignition: outcome.ignition,
             soc: outcome.soc,
             odometer_km: outcome.odometer_km,
-        });
+        };
+        match self.sender.try_send(sample) {
+            Ok(()) => {
+                QUEUE_DEPTH.fetch_add(1, Ordering::Relaxed);
+                true
+            }
+            Err(_) => {
+                DROPPED.fetch_add(1, Ordering::Relaxed);
+                tracing::warn!(vehicle = %outcome.vehicle_id, "TDengine queue full; sample dropped");
+                false
+            }
+        }
     }
 
     pub async fn query(
@@ -178,6 +219,33 @@ impl TdengineStore {
             });
         }
         Ok(points)
+    }
+
+    async fn write_sample_with_retry(&self, sample: &Sample) {
+        let retries = std::env::var("TSP_TDENGINE_WRITE_RETRIES")
+            .ok()
+            .and_then(|value| value.parse::<u32>().ok())
+            .unwrap_or(3)
+            .min(10);
+        for attempt in 0..=retries {
+            match self.write_sample(sample).await {
+                Ok(()) => {
+                    WRITES.fetch_add(1, Ordering::Relaxed);
+                    return;
+                }
+                Err(error) => {
+                    if attempt < retries {
+                        RETRIES.fetch_add(1, Ordering::Relaxed);
+                        let backoff =
+                            std::time::Duration::from_millis(100 * (1u64 << attempt.min(5)));
+                        tokio::time::sleep(backoff).await;
+                    } else {
+                        FAILURES.fetch_add(1, Ordering::Relaxed);
+                        tracing::warn!(%error, vehicle = %sample.vehicle_id, "TDengine write failed after retries");
+                    }
+                }
+            }
+        }
     }
 
     async fn write_sample(&self, sample: &Sample) -> AppResult<()> {
@@ -336,5 +404,73 @@ mod tests {
         assert_eq!(points.len(), 1);
         assert_eq!(points[0].source, "tdengine");
         assert!((points[0].lat - 31.2).abs() < f64::EPSILON);
+    }
+
+    #[tokio::test]
+    async fn write_retries_transient_failures() {
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering as AtomicOrdering},
+            Arc,
+        };
+
+        use axum::{extract::State, routing::post, Router};
+
+        async fn sql(
+            State(inserts): State<Arc<AtomicUsize>>,
+            body: String,
+        ) -> axum::Json<serde_json::Value> {
+            if body.trim_start().starts_with("INSERT") {
+                let attempt = inserts.fetch_add(1, AtomicOrdering::SeqCst);
+                if attempt < 2 {
+                    return axum::Json(serde_json::json!({"code": 1, "desc": "busy"}));
+                }
+            }
+            axum::Json(serde_json::json!({"code": 0}))
+        }
+
+        let inserts = Arc::new(AtomicUsize::new(0));
+        let app = Router::new().route("/rest/sql", post(sql).with_state(inserts.clone()));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        let store = TdengineStore::start(
+            format!("http://{addr}"),
+            "root".to_string(),
+            "taosdata".to_string(),
+            "tsp".to_string(),
+        )
+        .await
+        .expect("store");
+        let before = stats();
+        assert!(store.enqueue(&IngestOutcome {
+            vehicle_id: "veh-tdengine".to_string(),
+            plate_no: "沪A12345".to_string(),
+            ts: "2026-11-24T08:00:00Z".to_string(),
+            lat: 31.2,
+            lon: 121.4,
+            speed: 50.0,
+            heading: 90.0,
+            ignition: true,
+            soc: 80.0,
+            odometer_km: 100.0,
+            status: "online".to_string(),
+            alerts: Vec::new(),
+            trip_started: false,
+            trip_ended: false,
+        }));
+        for _ in 0..100 {
+            if stats().writes > before.writes {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        let after = stats();
+        assert_eq!(inserts.load(AtomicOrdering::SeqCst), 3);
+        assert_eq!(after.writes, before.writes + 1);
+        assert!(after.retries >= before.retries + 2);
     }
 }
