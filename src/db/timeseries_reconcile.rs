@@ -56,6 +56,22 @@ impl Db {
         org_name: Option<&str>,
         consistent: Option<bool>,
     ) -> AppResult<Vec<TimeseriesReconciliation>> {
+        self.list_timeseries_reconciliations_page(limit, None, vehicle_id, org_name, consistent)
+            .await
+    }
+
+    pub async fn list_timeseries_reconciliations_page(
+        &self,
+        limit: i64,
+        before: Option<(&str, &str)>,
+        vehicle_id: Option<&str>,
+        org_name: Option<&str>,
+        consistent: Option<bool>,
+    ) -> AppResult<Vec<TimeseriesReconciliation>> {
+        let (before_ts, before_id) = match before {
+            Some((ts, id)) => (Some(ts), Some(id)),
+            None => (None, None),
+        };
         let rows = self
             .query(
                 "SELECT id, vehicle_id, org_name, from_ts, to_ts, pg_count, td_count,
@@ -64,11 +80,15 @@ impl Db {
                  WHERE (?1 IS NULL OR vehicle_id = ?1)
                    AND (?2 IS NULL OR org_name = ?2)
                    AND (?3 IS NULL OR consistent = ?3)
-                 ORDER BY checked_at DESC LIMIT ?4",
+                   AND (?4 IS NULL OR checked_at < ?4
+                        OR (checked_at = ?4 AND id < ?5))
+                 ORDER BY checked_at DESC, id DESC LIMIT ?6",
             )
             .bind(vehicle_id)
             .bind(org_name)
             .bind(consistent.map(i64::from))
+            .bind(before_ts)
+            .bind(before_id)
             .bind(limit.clamp(1, 5000))
             .fetch_all(self.pool())
             .await?;
@@ -158,5 +178,52 @@ mod tests {
             .await
             .expect("list")
             .is_empty());
+    }
+
+    #[tokio::test]
+    async fn reconciliation_history_keyset_pagination() {
+        let db = Db::in_memory().await.expect("db");
+        for (id, checked) in [
+            ("a", "2026-11-24T00:00:00Z"),
+            ("b", "2026-11-24T00:00:01Z"),
+            ("c", "2026-11-24T00:00:02Z"),
+        ] {
+            db.query(
+                "INSERT INTO timeseries_reconciliations
+                 (id, vehicle_id, org_name, from_ts, to_ts, pg_count, td_count, count_delta, consistent, checked_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            )
+            .bind(id)
+            .bind("veh")
+            .bind("org")
+            .bind("f")
+            .bind("t")
+            .bind(1i64)
+            .bind(0i64)
+            .bind(1i64)
+            .bind(0i64)
+            .bind(checked)
+            .execute(db.pool())
+            .await
+            .expect("insert");
+        }
+        let first = db
+            .list_timeseries_reconciliations_page(2, None, None, None, None)
+            .await
+            .expect("first");
+        assert_eq!(first.len(), 2);
+        let last = first.last().unwrap();
+        let second = db
+            .list_timeseries_reconciliations_page(
+                2,
+                Some((&last.checked_at, &last.id)),
+                None,
+                None,
+                None,
+            )
+            .await
+            .expect("second");
+        assert_eq!(second.len(), 1);
+        assert_eq!(second[0].id, "a");
     }
 }

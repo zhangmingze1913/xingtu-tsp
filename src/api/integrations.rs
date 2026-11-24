@@ -180,6 +180,7 @@ pub struct ReconcileHistoryQuery {
     pub vehicle_id: Option<String>,
     pub org_name: Option<String>,
     pub consistent: Option<bool>,
+    pub cursor: Option<String>,
 }
 
 pub async fn timeseries_reconciliations(
@@ -188,16 +189,24 @@ pub async fn timeseries_reconciliations(
     Query(query): Query<ReconcileHistoryQuery>,
 ) -> AppResult<Json<Value>> {
     let org_name = scoped_history_org(&user, query.org_name.as_deref())?;
+    let before = query
+        .cursor
+        .as_deref()
+        .and_then(|cursor| cursor.split_once('|'));
     let rows = state
         .db
-        .list_timeseries_reconciliations(
+        .list_timeseries_reconciliations_page(
             query.limit.unwrap_or(50).clamp(1, 200),
+            before,
             query.vehicle_id.as_deref(),
             org_name.as_deref(),
             query.consistent,
         )
         .await?;
-    Ok(Json(json!({"items": rows})))
+    let next_cursor = rows
+        .last()
+        .map(|row| format!("{}|{}", row.checked_at, row.id));
+    Ok(Json(json!({"items": rows, "next_cursor": next_cursor})))
 }
 
 pub async fn timeseries_spool(

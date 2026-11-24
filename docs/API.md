@@ -541,7 +541,8 @@ GET /integrations/timeseries/reconciliations?limit=50
 ```
 
 - admin 可查全部组织；非管理员仅限本组织
-- 返回 `items`：vehicle_id/from/to/pg_count/td_count/count_delta/consistent/checked_at
+- 返回 `items` 与 `next_cursor`
+- 下一页：`cursor=<checked_at>|<id>`：vehicle_id/from/to/pg_count/td_count/count_delta/consistent/checked_at
 - 定时任务只记录 mismatch；手动对账每次记录
 
 ## TDengine spool

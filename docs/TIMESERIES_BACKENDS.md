@@ -254,6 +254,7 @@ GET /api/integrations/timeseries/reconciliations?limit=50
 - admin 可查全部组织；非管理员只能查自己 `org_name`
 - 未绑定组织的非管理员返回 403；请求里的 `org_name` 会被忽略
 - 可选 `vehicle_id`、`org_name`、`consistent=true|false` 过滤
+- keyset 游标：响应含 `next_cursor`（`checked_at|id`），下一页传 `cursor=<next_cursor>`
 - 历史默认保留 90 天，每 6 小时清理；`0` 关闭
 - CSV 导出：
 
