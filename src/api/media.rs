@@ -35,6 +35,11 @@ channel <input id="channel" value="1" size="3">
 <button id="stop">停止</button>
 </p>
 <video id="v" controls autoplay muted style="width:480px;background:#000"></video>
+<p>
+<button id="archiveList">归档列表</button>
+<span id="archiveStatus"></span>
+</p>
+<div id="archiveListBox" style="font-size:13px;line-height:1.8"></div>
 <p id="status">实时快照来自 TSP_MEDIA_UDP_ADDR；演示样本为内置媒体。</p>
 <script>
 const video = document.getElementById('v');
@@ -148,6 +153,60 @@ document.getElementById('live').onclick = () => {
   const channel = selected ? selected.split('/')[1] : document.getElementById('channel').value.trim();
   load('/api/media/live/' + encodeURIComponent(sim) + '/' + encodeURIComponent(channel), '实时快照');
 };
+
+function currentTarget() {
+  const selected = document.getElementById('session').value;
+  const sim = selected ? selected.split('/')[0] : document.getElementById('sim').value.trim();
+  const channel = selected ? selected.split('/')[1] : document.getElementById('channel').value.trim();
+  return { sim, channel };
+}
+
+async function downloadArchive(key) {
+  const response = await fetch('/api/media/archive/' + key.split('/').map(encodeURIComponent).join('/'), { cache: 'no-store', headers: authHeaders() });
+  if (!response.ok) { status.textContent = '归档下载不可用: ' + response.status; return; }
+  const blob = await response.blob();
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = key.split('/').pop() || 'segment.bin';
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 5000);
+}
+
+function playArchive(key) {
+  load('/api/media/archive/playback?key=' + encodeURIComponent(key), '归档回放');
+}
+
+async function refreshArchive() {
+  const { sim, channel } = currentTarget();
+  const box = document.getElementById('archiveListBox');
+  const label = document.getElementById('archiveStatus');
+  box.innerHTML = '';
+  label.textContent = '查询中...';
+  try {
+    const response = await fetch('/api/media/archive?sim=' + encodeURIComponent(sim) + '&channel=' + encodeURIComponent(channel), { cache: 'no-store', headers: authHeaders() });
+    if (!response.ok) { label.textContent = '归档不可用: ' + response.status; return; }
+    const data = await response.json();
+    label.textContent = data.objects.length + ' 个对象';
+    for (const item of data.objects) {
+      const row = document.createElement('div');
+      const name = document.createElement('span');
+      name.textContent = item.key + ' (' + item.size + ' bytes) ';
+      const play = document.createElement('button');
+      play.textContent = '播放';
+      play.onclick = () => playArchive(item.key);
+      const download = document.createElement('button');
+      download.textContent = '下载';
+      download.onclick = () => downloadArchive(item.key);
+      row.append(name, play, download);
+      box.append(row);
+    }
+    if (data.objects.length === 0) { label.textContent = '暂无归档'; }
+  } catch (e) {
+    label.textContent = '归档查询失败';
+  }
+}
+
+document.getElementById('archiveList').onclick = refreshArchive;
 </script>
 </body>
 </html>"#;
@@ -287,6 +346,46 @@ pub async fn archive_list(
     })))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ArchivePlaybackQuery {
+    pub key: String,
+}
+
+pub async fn archive_playback(
+    _user: AuthUser,
+    Query(query): Query<ArchivePlaybackQuery>,
+) -> Result<Response, AppError> {
+    let archive = archive::global().ok_or_else(archive_unavailable)?;
+    archive
+        .validate_key(&query.key)
+        .map_err(|error| AppError::bad_request(error.to_string()))?;
+    let (video_key, audio_key) = archive_pair(&query.key)?;
+
+    let video = archive.get(&video_key).await.map_err(archive_error)?;
+    let audio = match audio_key {
+        Some(key) => match archive.get(&key).await {
+            Ok(bytes) => Some(bytes),
+            Err(error) => {
+                tracing::debug!(%error, %key, "archive audio sidecar unavailable");
+                None
+            }
+        },
+        None => None,
+    };
+    let program = std::env::var("TSP_FFMPEG").unwrap_or_else(|_| "ffmpeg".to_string());
+    let remuxer = FfmpegRemuxer::new(program);
+    let bytes = remuxer
+        .to_fmp4(Some(&video), audio.as_deref())
+        .map_err(|error| {
+            AppError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "archive_playback_failed",
+                format!("{error:?}"),
+            )
+        })?;
+    Ok(mp4_response(&bytes))
+}
+
 pub async fn archive_get(_user: AuthUser, Path(key): Path<String>) -> Result<Response, AppError> {
     let archive = archive::global().ok_or_else(archive_unavailable)?;
     archive
@@ -314,6 +413,18 @@ pub async fn archive_get(_user: AuthUser, Path(key): Path<String>) -> Result<Res
         bytes,
     )
         .into_response())
+}
+
+fn archive_pair(key: &str) -> Result<(String, Option<String>), AppError> {
+    if let Some(stem) = key.strip_suffix(".h264") {
+        Ok((key.to_string(), Some(format!("{stem}.aac"))))
+    } else if let Some(stem) = key.strip_suffix(".aac") {
+        Ok((format!("{stem}.h264"), Some(key.to_string())))
+    } else {
+        Err(AppError::bad_request(
+            "archive playback requires a .h264 or .aac object",
+        ))
+    }
 }
 
 fn archive_unavailable() -> AppError {
@@ -350,9 +461,29 @@ mod tests {
         assert!(PLAYER_HTML.contains("/api/media/sample.mp4"));
         assert!(PLAYER_HTML.contains("/api/media/live/"));
         assert!(PLAYER_HTML.contains("/api/media/sessions"));
+        assert!(PLAYER_HTML.contains("/api/media/archive"));
+        assert!(PLAYER_HTML.contains("/api/media/archive/playback"));
+        assert!(PLAYER_HTML.contains("archiveList"));
         assert!(PLAYER_HTML.contains("/stream"));
         assert!(PLAYER_HTML.contains("id=\"stop\""));
         assert!(PLAYER_HTML.contains("avc1.42E01E"));
         assert!(PLAYER_HTML.contains("mp4a.40.2"));
+    }
+
+    #[test]
+    fn archive_playback_pairs_video_and_audio_keys() {
+        let (video, audio) = archive_pair("media/1/1/2026/11/24/080001-000000.h264").unwrap();
+        assert!(video.ends_with(".h264"));
+        assert_eq!(
+            audio.as_deref(),
+            Some("media/1/1/2026/11/24/080001-000000.aac")
+        );
+        let (video, audio) = archive_pair("media/1/1/2026/11/24/080001-000000.aac").unwrap();
+        assert!(video.ends_with(".h264"));
+        assert_eq!(
+            audio.as_deref(),
+            Some("media/1/1/2026/11/24/080001-000000.aac")
+        );
+        assert!(archive_pair("media/1/1/file.mp4").is_err());
     }
 }

@@ -85,6 +85,7 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/media/sessions", get(media::sessions))
         .route("/media/archive", get(media::archive_list))
+        .route("/media/archive/playback", get(media::archive_playback))
         .route("/media/archive/{*key}", get(media::archive_get))
         .route("/audit/export", get(audit::export))
         .route("/integrations/standards", get(integrations::standards))

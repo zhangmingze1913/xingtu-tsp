@@ -473,7 +473,7 @@ cargo run --release
 
 ## Object storage
 
-RustFS is the S3-compatible object store for recorded media. With `TSP_MEDIA_UDP_ADDR` and `TSP_RUSTFS_ARCHIVE=true`, 1078 media is segmented on keyframes/time and uploaded as raw H.264/AAC. Archive objects are listed/downloaded via `/api/media/archive`. See [docs/RUSTFS.md](docs/RUSTFS.md) for Compose/Kubernetes, credentials, and the MinIO migration path.
+RustFS is the S3-compatible object store for recorded media. With `TSP_MEDIA_UDP_ADDR` and `TSP_RUSTFS_ARCHIVE=true`, 1078 media is segmented on keyframes/time and uploaded as raw H.264/AAC. Archive objects are listed/downloaded via `/api/media/archive`. Archive playback is available at `/api/media/archive/playback`; run `scripts/rustfs-smoke.ps1` for a real S3 upload/download check. See [docs/RUSTFS.md](docs/RUSTFS.md) for Compose/Kubernetes, credentials, and the MinIO migration path.
 
 ---
 

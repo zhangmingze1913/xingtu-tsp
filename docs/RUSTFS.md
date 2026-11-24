@@ -164,7 +164,39 @@ GET /api/media/archive/media/138000000001/1/2026/11/24/080001-000000.h264
 Authorization: Bearer <token>
 ```
 
+归档回放（服务端把同名 `.h264`/`.aac` remux 为 fMP4）：
+
+```http
+GET /api/media/archive/playback?key=media/138000000001/1/2026/11/24/080001-000000.h264
+Authorization: Bearer <token>
+```
+
 `key` 必须带 `TSP_RUSTFS_PREFIX` 前缀，且拒绝 `..`、反斜杠和目录结尾。
+
+### 播放器 UI
+
+`/media` 页面新增“归档列表”：
+
+- 输入/选择 SIM 与通道
+- 调 `GET /api/media/archive` 列出对象
+- “播放”调用归档回放接口，经 MSE 播放
+- “下载”带 Token 拉取原文件
+
+### 真实 RustFS 联调脚本
+
+```powershell
+.\scripts\rustfs-smoke.ps1
+```
+
+脚本执行：
+
+- S3 `/health` 与 Console `/health`
+- 创建桶
+- 上传 `assets/sample.h264`
+- `s3 ls` 验证
+- 下载并比对 SHA-256
+
+依赖 AWS CLI v2；RustFS 需先启动。
 
 ### 代码位置
 
@@ -179,17 +211,18 @@ src/lib.rs             启动时确保桶存在
 
 - `media_keys_are_prefixed_and_path_safe`
 - `prefix_and_segment_limits_have_safe_defaults`
+- `archive_playback_pairs_video_and_audio_keys`
 - `archive_put_list_get_against_s3_mock`：真实 S3 客户端对 mock 发起 PUT/GET/ListObjectsV2
 
 未执行：
 
-- 真实 RustFS 容器的上传/下载
+- 真实 RustFS 容器的上传/下载（脚本已提供，本机无 Docker/AWS CLI 未运行）
 - 断点、限流、大文件、并发上传
-- 归档对象的播放器回放（当前只提供 raw 下载）
+- 真实 1078 终端产生的长分段回放
 
 ### 限制
 
-- 归档为 raw Annex-B/ADTS，不是 MP4；浏览器播放需要先 remux
+- 归档原对象为 raw Annex-B/ADTS；播放接口在服务端 remux 为 fMP4
 - 分段以 I 帧为优先边界；兜底切分可能从非 I 帧开始
 - 音频/视频分段分别上传，不保证同名对象原子成对
 - 未实现归档生命周期、对象锁、跨区域复制

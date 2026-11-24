@@ -509,3 +509,17 @@ curl -s -X POST http://127.0.0.1:8090/api/vehicles/veh_001/commands \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"command":"find"}' | jq
 ```
+
+## 媒体归档（RustFS）
+
+```http
+GET /media/archive?sim=138000000001&channel=1
+GET /media/archive/playback?key=media/138000000001/1/2026/11/24/080001-000000.h264
+GET /media/archive/{key}
+```
+
+- 列表返回 `prefix` 与 `objects[{key,size}]`
+- 回放下载同名 H.264/AAC，服务端 remux 为 fMP4
+- 下载返回 raw 对象，`Content-Type` 为 `video/h264` 或 `audio/aac`
+- `key` 必须带 `TSP_RUSTFS_PREFIX`，拒绝 `..` 与反斜杠
+
