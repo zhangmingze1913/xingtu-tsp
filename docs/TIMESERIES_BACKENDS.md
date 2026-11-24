@@ -274,7 +274,7 @@ GET /api/integrations/timeseries/reconciliations/export/page?limit=500&cursor=<c
 - 非法 `cursor` 返回 400
 - CSV 行仍做字段转义
 - CSV 字段做引号转义
-- `footer=1` 时末尾输出 `#END,<rows>`；缺失该行表示传输/查询中断
+- `footer=true` 时末尾输出 `#END,<rows>`；缺失该行表示传输/查询中断
 - 默认不输出 footer，保持标准 CSV 兼容
 - CSV 含 `org_name` 列
 - `Content-Type: text/csv`
