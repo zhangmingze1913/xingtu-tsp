@@ -195,6 +195,14 @@ impl Metrics {
             archive.playback_cache_miss
         ));
         let tdengine = crate::tdengine::stats();
+        out.push_str(
+            "# HELP xingtu_tdengine_history_pruned_total Reconciliation history rows pruned.\n",
+        );
+        out.push_str("# TYPE xingtu_tdengine_history_pruned_total counter\n");
+        out.push_str(&format!(
+            "xingtu_tdengine_history_pruned_total {}\n",
+            tdengine.history_pruned
+        ));
         out.push_str("# HELP xingtu_tdengine_spooled_total TDengine samples persisted after retry exhaustion.\n");
         out.push_str("# TYPE xingtu_tdengine_spooled_total counter\n");
         out.push_str(&format!(
@@ -346,5 +354,6 @@ mod tests {
         assert!(text.contains("xingtu_tdengine_spool_pending"));
         assert!(text.contains("xingtu_tdengine_reconcile_checks_total"));
         assert!(text.contains("xingtu_tdengine_alert_sent_total"));
+        assert!(text.contains("xingtu_tdengine_history_pruned_total"));
     }
 }

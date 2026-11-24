@@ -78,6 +78,7 @@ data:
   TSP_RECONCILE_ALERT_COOLDOWN_SCOPE: "global"
   TSP_RECONCILE_ALERT_RETRIES: "2"
   TSP_RECONCILE_ALERT_FORMAT: "generic"
+  TSP_RECONCILE_ALERT_MODE: "per_vehicle"
   # Optional Walrus durable event archive (length-prefixed TCP)
   TSP_WALRUS_ADDR: ""
   TSP_WALRUS_TOPIC: "tsp-events"

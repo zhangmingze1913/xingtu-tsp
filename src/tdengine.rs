@@ -38,6 +38,7 @@ pub static RECONCILE_MISMATCHES: AtomicU64 = AtomicU64::new(0);
 pub static ALERTS_SENT: AtomicU64 = AtomicU64::new(0);
 pub static ALERTS_FAILED: AtomicU64 = AtomicU64::new(0);
 pub static ALERTS_SKIPPED: AtomicU64 = AtomicU64::new(0);
+pub static HISTORY_PRUNED: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TdengineStats {
@@ -51,6 +52,7 @@ pub struct TdengineStats {
     pub alerts_sent: u64,
     pub alerts_failed: u64,
     pub alerts_skipped: u64,
+    pub history_pruned: u64,
 }
 
 pub fn stats() -> TdengineStats {
@@ -65,6 +67,7 @@ pub fn stats() -> TdengineStats {
         alerts_sent: ALERTS_SENT.load(Ordering::Relaxed),
         alerts_failed: ALERTS_FAILED.load(Ordering::Relaxed),
         alerts_skipped: ALERTS_SKIPPED.load(Ordering::Relaxed),
+        history_pruned: HISTORY_PRUNED.load(Ordering::Relaxed),
     }
 }
 
@@ -90,6 +93,8 @@ impl AlertCooldown {
         true
     }
 }
+
+static ALERT_COOLDOWN: OnceLock<AlertCooldown> = OnceLock::new();
 
 #[derive(Clone)]
 pub struct TdengineStore {
@@ -472,7 +477,6 @@ pub async fn notify_reconcile_mismatch(
         .and_then(|value| value.parse::<i64>().ok())
         .unwrap_or(300)
         .max(1);
-    static COOLDOWN: OnceLock<AlertCooldown> = OnceLock::new();
     let scope = std::env::var("TSP_RECONCILE_ALERT_COOLDOWN_SCOPE")
         .unwrap_or_else(|_| "global".to_string());
     let key = if scope.eq_ignore_ascii_case("vehicle") {
@@ -481,7 +485,7 @@ pub async fn notify_reconcile_mismatch(
         "*"
     };
     let now = Utc::now().timestamp();
-    if !COOLDOWN
+    if !ALERT_COOLDOWN
         .get_or_init(AlertCooldown::default)
         .allow_at(key, now, cooldown)
     {
@@ -498,6 +502,41 @@ pub async fn notify_reconcile_mismatch(
         Err(error) => {
             ALERTS_FAILED.fetch_add(1, Ordering::Relaxed);
             tracing::warn!(%error, %url, "reconciliation alert webhook failed");
+        }
+    }
+}
+
+/// Send one aggregated alert for a scheduled reconciliation run.
+pub async fn notify_reconcile_summary(vehicles: &[String], from: &str, to: &str) {
+    let Ok(url) = std::env::var("TSP_RECONCILE_ALERT_WEBHOOK") else {
+        return;
+    };
+    if url.trim().is_empty() {
+        return;
+    }
+    let cooldown = std::env::var("TSP_RECONCILE_ALERT_COOLDOWN_SECS")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(300)
+        .max(1);
+    let now = Utc::now().timestamp();
+    if !ALERT_COOLDOWN
+        .get_or_init(AlertCooldown::default)
+        .allow_at("*summary", now, cooldown)
+    {
+        ALERTS_SKIPPED.fetch_add(1, Ordering::Relaxed);
+        return;
+    }
+    let format =
+        std::env::var("TSP_RECONCILE_ALERT_FORMAT").unwrap_or_else(|_| "generic".to_string());
+    let payload = summary_alert_payload(&format, vehicles, from, to);
+    match send_webhook(url.trim(), &payload).await {
+        Ok(()) => {
+            ALERTS_SENT.fetch_add(1, Ordering::Relaxed);
+        }
+        Err(error) => {
+            ALERTS_FAILED.fetch_add(1, Ordering::Relaxed);
+            tracing::warn!(%error, %url, "reconciliation summary alert failed");
         }
     }
 }
@@ -544,6 +583,42 @@ pub(crate) async fn send_webhook_signed(
         }
     }
     Err(AppError::internal(last_error))
+}
+
+pub(crate) fn summary_alert_payload(
+    format: &str,
+    vehicles: &[String],
+    from: &str,
+    to: &str,
+) -> Value {
+    let count = vehicles.len();
+    let sample: Vec<&String> = vehicles.iter().take(20).collect();
+    let checked_at = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    if format.eq_ignore_ascii_case("alertmanager") {
+        serde_json::json!([{
+            "labels": {
+                "alertname": "TdengineReconcileMismatchSummary",
+                "severity": "warning",
+                "service": "xingtu-tsp",
+            },
+            "annotations": {
+                "summary": "TDengine/PostgreSQL reconciliation mismatches",
+                "description": format!(
+                    "mismatch_vehicles={count} window={from}..{to} sample={sample:?}"
+                ),
+            },
+            "startsAt": checked_at,
+        }])
+    } else {
+        serde_json::json!({
+            "type": "tdengine_reconcile_summary",
+            "mismatch_vehicles": count,
+            "vehicles": sample,
+            "from": from,
+            "to": to,
+            "checked_at": checked_at,
+        })
+    }
 }
 
 pub(crate) fn alert_payload(
@@ -942,5 +1017,18 @@ mod tests {
         assert!(cooldown.allow_at("v1", 401, 300));
         assert!(cooldown.allow_at("*", 100, 300));
         assert!(!cooldown.allow_at("*", 200, 300));
+    }
+
+    #[test]
+    fn summary_payload_supports_both_formats() {
+        let vehicles = vec!["v1".to_string(), "v2".to_string()];
+        let generic = summary_alert_payload("generic", &vehicles, "a", "b");
+        assert_eq!(generic["type"], "tdengine_reconcile_summary");
+        assert_eq!(generic["mismatch_vehicles"], 2);
+        let am = summary_alert_payload("alertmanager", &vehicles, "a", "b");
+        assert_eq!(
+            am.as_array().expect("array")[0]["labels"]["alertname"],
+            "TdengineReconcileMismatchSummary"
+        );
     }
 }

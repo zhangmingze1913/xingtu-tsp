@@ -78,6 +78,7 @@ TSP_RECONCILE_ALERT_COOLDOWN_SECS=300
 TSP_RECONCILE_ALERT_COOLDOWN_SCOPE=global
 TSP_RECONCILE_ALERT_RETRIES=2
 TSP_RECONCILE_ALERT_FORMAT=alertmanager
+TSP_RECONCILE_ALERT_MODE=summary
 TSP_RECONCILE_ALERT_WEBHOOK_SECRET=change-me
 ```
 
@@ -267,6 +268,10 @@ GET /api/integrations/timeseries/reconciliations/export?vehicle_id=...&org_name=
 - 配置密钥后发送 `X-TSP-Signature: sha256=<hex>`（HMAC-SHA256）
 - `TSP_RECONCILE_ALERT_FORMAT=generic|alertmanager`
 - Alertmanager 格式为 v4 JSON 数组，labels 含 `alertname/severity/service/vehicle_id`
+- `TSP_RECONCILE_ALERT_MODE=per_vehicle|summary`
+  - `per_vehicle`：每车一条（受冷却约束）
+  - `summary`：每次定时对账聚合一条
+- 历史清理指标：`xingtu_tdengine_history_pruned_total`
 - 指标：`xingtu_tdengine_alert_sent_total`、`failed_total`、`skipped_total`
 - 指标：`xingtu_tdengine_reconcile_checks_total`、`xingtu_tdengine_reconcile_mismatches_total`
 

@@ -235,7 +235,11 @@ fn spawn_timeseries_history_pruner(state: AppState) {
                 .await
             {
                 Ok(0) => {}
-                Ok(deleted) => tracing::info!(deleted, days, "pruned reconciliation history"),
+                Ok(deleted) => {
+                    crate::tdengine::HISTORY_PRUNED
+                        .fetch_add(deleted, std::sync::atomic::Ordering::Relaxed);
+                    tracing::info!(deleted, days, "pruned reconciliation history");
+                }
                 Err(error) => tracing::warn!(%error, "reconciliation history prune failed"),
             }
         }
@@ -296,7 +300,10 @@ fn spawn_tdengine_reconciler(state: AppState) {
             let Some(tdengine) = state.tdengine.as_ref() else {
                 continue;
             };
+            let alert_mode = std::env::var("TSP_RECONCILE_ALERT_MODE")
+                .unwrap_or_else(|_| "per_vehicle".to_string());
             let mut mismatches = 0;
+            let mut mismatch_ids = Vec::new();
             for id in &ids {
                 let pg = match state.db.telemetry_range_stats(id, &from, &to).await {
                     Ok(stats) => stats,
@@ -341,11 +348,18 @@ fn spawn_tdengine_reconciler(state: AppState) {
                     {
                         tracing::warn!(%error, vehicle = %id, "reconciliation history write failed");
                     }
-                    crate::tdengine::notify_reconcile_mismatch(
-                        id, &from, &to, pg.count, td.count, delta,
-                    )
-                    .await;
+                    if alert_mode.eq_ignore_ascii_case("summary") {
+                        mismatch_ids.push(id.clone());
+                    } else {
+                        crate::tdengine::notify_reconcile_mismatch(
+                            id, &from, &to, pg.count, td.count, delta,
+                        )
+                        .await;
+                    }
                 }
+            }
+            if alert_mode.eq_ignore_ascii_case("summary") && !mismatch_ids.is_empty() {
+                crate::tdengine::notify_reconcile_summary(&mismatch_ids, &from, &to).await;
             }
             if mismatches > 0 {
                 tracing::warn!(
