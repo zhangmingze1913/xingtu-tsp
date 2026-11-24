@@ -62,6 +62,7 @@ pub struct ArchiveStats {
     pub playback_cache_miss: u64,
     pub upload_spooled: u64,
     pub spool_replayed: u64,
+    pub spool_pending: u64,
 }
 
 pub fn stats() -> ArchiveStats {
@@ -77,6 +78,7 @@ pub fn stats() -> ArchiveStats {
         playback_cache_miss: PLAYBACK_CACHE_MISS.load(Ordering::Relaxed),
         upload_spooled: UPLOAD_SPOOLED.load(Ordering::Relaxed),
         spool_replayed: SPOOL_REPLAYED.load(Ordering::Relaxed),
+        spool_pending: crate::media::archive_spool::SPOOL_PENDING.load(Ordering::Relaxed),
     }
 }
 
@@ -776,5 +778,64 @@ mod tests {
         let left = objects.lock().unwrap();
         assert_eq!(left.len(), 1);
         assert!(left.contains_key("media/1/1/new.h264"));
+    }
+
+    #[tokio::test]
+    async fn replay_spool_uploads_and_removes_item() {
+        use axum::{
+            body::Bytes,
+            extract::{Path, State},
+            http::StatusCode,
+            routing::put,
+            Router,
+        };
+
+        use crate::media::archive_spool::ArchiveSpool;
+
+        type Objects = Arc<std::sync::Mutex<std::collections::HashMap<String, Vec<u8>>>>;
+
+        async fn put_object(
+            State(objects): State<Objects>,
+            Path(key): Path<String>,
+            body: Bytes,
+        ) -> StatusCode {
+            objects.lock().unwrap().insert(key, body.to_vec());
+            StatusCode::OK
+        }
+
+        let objects: Objects = Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
+        let app = Router::new().route(
+            "/tsp-media/{*key}",
+            put(put_object).with_state(objects.clone()),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        let archive = RustFsArchive::from_parts(
+            &format!("http://{addr}"),
+            "tsp-media",
+            "access",
+            "secret",
+            "us-east-1",
+            "media",
+        )
+        .expect("archive");
+        let dir = std::env::temp_dir().join(format!("tsp-replay-{}", uuid::Uuid::new_v4()));
+        let spool = ArchiveSpool::new(&dir).expect("spool");
+        spool
+            .save("media/1/1/replay.h264", b"segment".to_vec(), "video/h264")
+            .await
+            .expect("save");
+        assert_eq!(replay_spool(&archive, &spool).await, 1);
+        assert!(objects
+            .lock()
+            .unwrap()
+            .contains_key("media/1/1/replay.h264"));
+        assert!(spool.pending().await.expect("pending").is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

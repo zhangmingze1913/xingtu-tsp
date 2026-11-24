@@ -177,7 +177,8 @@ media/{sim}/{channel}/YYYY/MM/DD/HHMMSS-{sequence}.aac
 - 后台每 `TSP_ARCHIVE_SPOOL_REPLAY_SECS` 秒扫描并重试
 - 成功后删除暂存文件
 - 暂存目录设为 `off` 可关闭
-- 指标：`xingtu_archive_upload_spooled_total`、`xingtu_archive_spool_replayed_total`
+- 指标：`xingtu_archive_upload_spooled_total`、`xingtu_archive_spool_replayed_total
+xingtu_archive_spool_pending`
 
 注意：K8s 默认使用 `/tmp/archive-spool`，Pod 重建会丢失；生产应挂载持久卷或改用对象存储队列。
 
@@ -278,6 +279,7 @@ src/lib.rs             启动时确保桶存在
 - `cache_evicts_by_bytes_and_skips_oversize`
 - `spool_save_pending_and_remove_roundtrip`
 - `spool_id_is_stable_and_path_safe`
+- `replay_spool_uploads_and_removes_item`
 - `render_includes_archive_counters`
 - `archive_put_list_get_against_s3_mock`：真实 S3 客户端对 mock 发起 PUT/GET/ListObjectsV2
 

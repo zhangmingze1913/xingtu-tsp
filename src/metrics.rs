@@ -151,6 +151,28 @@ impl Metrics {
             archive.playback_failure
         ));
         out.push_str(
+            "# HELP xingtu_archive_upload_spooled_total Failed uploads persisted to disk.\n",
+        );
+        out.push_str("# TYPE xingtu_archive_upload_spooled_total counter\n");
+        out.push_str(&format!(
+            "xingtu_archive_upload_spooled_total {}\n",
+            archive.upload_spooled
+        ));
+        out.push_str(
+            "# HELP xingtu_archive_spool_replayed_total Spooled uploads replayed successfully.\n",
+        );
+        out.push_str("# TYPE xingtu_archive_spool_replayed_total counter\n");
+        out.push_str(&format!(
+            "xingtu_archive_spool_replayed_total {}\n",
+            archive.spool_replayed
+        ));
+        out.push_str("# HELP xingtu_archive_spool_pending Spooled uploads waiting for replay.\n");
+        out.push_str("# TYPE xingtu_archive_spool_pending gauge\n");
+        out.push_str(&format!(
+            "xingtu_archive_spool_pending {}\n",
+            archive.spool_pending
+        ));
+        out.push_str(
             "# HELP xingtu_archive_playback_cache_hit_total Archive playbacks served from cache.\n",
         );
         out.push_str("# TYPE xingtu_archive_playback_cache_hit_total counter\n");
@@ -211,5 +233,6 @@ mod tests {
         assert!(text.contains("xingtu_archive_segments_dropped_total"));
         assert!(text.contains("xingtu_archive_playback_failure_total"));
         assert!(text.contains("xingtu_archive_playback_cache_hit_total"));
+        assert!(text.contains("xingtu_archive_spool_pending"));
     }
 }

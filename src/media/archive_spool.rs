@@ -6,7 +6,10 @@
 
 use std::{
     path::{Path, PathBuf},
-    sync::OnceLock,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        OnceLock,
+    },
 };
 
 use serde::{Deserialize, Serialize};
@@ -25,6 +28,8 @@ pub struct SpoolItem {
     pub content_type: String,
     pub bytes: Vec<u8>,
 }
+
+pub static SPOOL_PENDING: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone)]
 pub struct ArchiveSpool {
@@ -72,6 +77,7 @@ impl ArchiveSpool {
         let encoded = serde_json::to_vec(&meta).map_err(std::io::Error::other)?;
         tokio::fs::write(&meta_tmp, encoded).await?;
         tokio::fs::rename(&meta_tmp, &meta_path).await?;
+        SPOOL_PENDING.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
 
@@ -104,12 +110,18 @@ impl ArchiveSpool {
             });
         }
         items.sort_by(|left, right| left.id.cmp(&right.id));
+        SPOOL_PENDING.store(items.len() as u64, Ordering::Relaxed);
         Ok(items)
     }
 
     pub async fn remove(&self, id: &str) -> std::io::Result<()> {
-        let _ = tokio::fs::remove_file(self.dir.join(format!("{id}.json"))).await;
+        let removed = tokio::fs::remove_file(self.dir.join(format!("{id}.json")))
+            .await
+            .is_ok();
         let _ = tokio::fs::remove_file(self.dir.join(format!("{id}.bin"))).await;
+        if removed {
+            SPOOL_PENDING.fetch_sub(1, Ordering::Relaxed);
+        }
         Ok(())
     }
 }
