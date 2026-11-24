@@ -74,6 +74,8 @@ TSP_TIMESERIES_RECONCILE_WINDOW_MINUTES=15
 TSP_TIMESERIES_RECONCILE_MAX_VEHICLES=100
 TSP_RECONCILE_ALERT_WEBHOOK=https://alerts.example/hooks/tdengine
 TSP_RECONCILE_ALERT_COOLDOWN_SECS=300
+TSP_RECONCILE_ALERT_RETRIES=2
+TSP_RECONCILE_ALERT_WEBHOOK_SECRET=change-me
 ```
 
 `TSP_TDENGINE_URL` 必须是 taosAdapter 的 HTTP 地址，不是原生 6030 端口。
@@ -247,6 +249,8 @@ GET /api/integrations/timeseries/reconciliations?limit=50
 - `limit` 1–200，默认 50
 - 定时任务只持久化 mismatch，手动接口每次持久化
 - mismatch 可推送 JSON webhook；全局冷却默认 300s
+- 失败重试 2 次（`TSP_RECONCILE_ALERT_RETRIES`）
+- 配置密钥后发送 `X-TSP-Signature: sha256=<hex>`（HMAC-SHA256）
 - 指标：`xingtu_tdengine_alert_sent_total`、`failed_total`、`skipped_total`
 - 指标：`xingtu_tdengine_reconcile_checks_total`、`xingtu_tdengine_reconcile_mismatches_total`
 

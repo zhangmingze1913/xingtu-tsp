@@ -13,9 +13,11 @@
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 
 use chrono::{DateTime, Utc};
+use hmac::{Hmac, Mac};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::Sha256;
 use tokio::sync::mpsc;
 
 use crate::{
@@ -477,23 +479,60 @@ pub async fn notify_reconcile_mismatch(
 }
 
 pub(crate) async fn send_webhook(url: &str, payload: &Value) -> AppResult<()> {
+    let secret = std::env::var("TSP_RECONCILE_ALERT_WEBHOOK_SECRET").ok();
+    send_webhook_signed(url, payload, secret.as_deref()).await
+}
+
+pub(crate) async fn send_webhook_signed(
+    url: &str,
+    payload: &Value,
+    secret: Option<&str>,
+) -> AppResult<()> {
+    let body = serde_json::to_vec(payload)
+        .map_err(|error| AppError::internal(format!("alert payload: {error}")))?;
+    let signature = secret.map(|secret| webhook_signature(secret, &body));
+    let retries = std::env::var("TSP_RECONCILE_ALERT_RETRIES")
+        .ok()
+        .and_then(|value| value.parse::<u32>().ok())
+        .unwrap_or(2)
+        .min(5);
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(5))
         .build()
         .map_err(|error| AppError::internal(format!("alert client: {error}")))?;
-    let response = client
-        .post(url)
-        .json(payload)
-        .send()
-        .await
-        .map_err(|error| AppError::internal(format!("alert request: {error}")))?;
-    if !response.status().is_success() {
-        return Err(AppError::internal(format!(
-            "alert webhook HTTP {}",
-            response.status()
-        )));
+    let mut last_error = String::new();
+    for attempt in 0..=retries {
+        let mut request = client
+            .post(url)
+            .header("Content-Type", "application/json")
+            .body(body.clone());
+        if let Some(signature) = signature.as_deref() {
+            request = request.header("X-TSP-Signature", signature);
+        }
+        match request.send().await {
+            Ok(response) if response.status().is_success() => return Ok(()),
+            Ok(response) => last_error = format!("alert webhook HTTP {}", response.status()),
+            Err(error) => last_error = format!("alert request: {error}"),
+        }
+        if attempt < retries {
+            let backoff = std::time::Duration::from_millis(100 * (1u64 << attempt.min(5)));
+            tokio::time::sleep(backoff).await;
+        }
     }
-    Ok(())
+    Err(AppError::internal(last_error))
+}
+
+pub(crate) fn webhook_signature(secret: &str, body: &[u8]) -> String {
+    let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).expect("HMAC key");
+    mac.update(body);
+    let bytes = mac.finalize().into_bytes();
+    format!(
+        "sha256={}",
+        bytes
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    )
 }
 
 fn timestamp_text(value: &Value) -> Option<String> {
@@ -746,5 +785,70 @@ mod tests {
         let seen = seen.lock().unwrap();
         assert_eq!(seen.len(), 1);
         assert_eq!(seen[0]["delta"], 2);
+    }
+
+    #[tokio::test]
+    async fn webhook_signs_and_retries() {
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering as AtomicOrdering},
+            Arc, Mutex,
+        };
+
+        use axum::{
+            body::Bytes,
+            extract::State,
+            http::{HeaderMap, StatusCode},
+            routing::post,
+            Router,
+        };
+
+        #[derive(Clone)]
+        struct StateData {
+            attempts: Arc<AtomicUsize>,
+            last: Arc<Mutex<Option<(Option<String>, Vec<u8>)>>>,
+        }
+
+        async fn alert(
+            State(state): State<StateData>,
+            headers: HeaderMap,
+            body: Bytes,
+        ) -> StatusCode {
+            let attempt = state.attempts.fetch_add(1, AtomicOrdering::SeqCst);
+            let signature = headers
+                .get("x-tsp-signature")
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string);
+            *state.last.lock().unwrap() = Some((signature, body.to_vec()));
+            if attempt < 2 {
+                StatusCode::INTERNAL_SERVER_ERROR
+            } else {
+                StatusCode::OK
+            }
+        }
+
+        let state = StateData {
+            attempts: Arc::new(AtomicUsize::new(0)),
+            last: Arc::new(Mutex::new(None)),
+        };
+        let app = Router::new().route("/alert", post(alert).with_state(state.clone()));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        let payload = serde_json::json!({"type": "tdengine_reconcile_mismatch", "delta": 3});
+        send_webhook_signed(&format!("http://{addr}/alert"), &payload, Some("s3cret"))
+            .await
+            .expect("webhook");
+        assert_eq!(state.attempts.load(AtomicOrdering::SeqCst), 3);
+        let (signature, body) = state.last.lock().unwrap().clone().expect("seen");
+        let expected = webhook_signature("s3cret", &body);
+        assert_eq!(signature.as_deref(), Some(expected.as_str()));
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap()["delta"],
+            3
+        );
     }
 }
