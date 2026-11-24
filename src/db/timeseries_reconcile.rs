@@ -16,6 +16,7 @@ impl Db {
         Ok(row.map(|row| row.get::<String, _>(0)))
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn record_timeseries_reconciliation(
         &self,
         vehicle_id: &str,

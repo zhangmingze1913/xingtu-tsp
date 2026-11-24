@@ -325,7 +325,9 @@ tdengine::tests::rest_query_maps_rows_to_points
 - 指标：checks/mismatches
 - mismatch 可推送 JSON webhook（全局冷却）
 - `GET /api/integrations/timeseries/spool` / `POST .../spool/replay`
-- 历史支持 `vehicle_id` / `consistent` 过滤，默认保留 90 天
+- 历史支持 `vehicle_id` / `org_name` / `consistent` 过滤，默认保留 90 天
+- 历史可导出 CSV（含 org_name）
+- 告警冷却支持 `global` / `vehicle` 作用域
 - webhook 支持 HMAC-SHA256 签名、重试、`generic`/`alertmanager` 负载
 
 健康：
