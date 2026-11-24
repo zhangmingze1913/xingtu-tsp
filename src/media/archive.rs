@@ -9,7 +9,10 @@
 //! behaviour.
 
 use std::{
-    sync::{Arc, OnceLock},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, OnceLock,
+    },
     time::Duration,
 };
 
@@ -32,6 +35,37 @@ pub enum ArchiveError {
     S3(String),
     #[error("S3 upload timed out after {0:?}")]
     Timeout(Duration),
+}
+
+pub static UPLOAD_SUCCESS: AtomicU64 = AtomicU64::new(0);
+pub static UPLOAD_FAILURE: AtomicU64 = AtomicU64::new(0);
+pub static UPLOAD_RETRIES: AtomicU64 = AtomicU64::new(0);
+pub static SEGMENTS_DROPPED: AtomicU64 = AtomicU64::new(0);
+pub static CLEANUP_DELETED: AtomicU64 = AtomicU64::new(0);
+pub static PLAYBACK_SUCCESS: AtomicU64 = AtomicU64::new(0);
+pub static PLAYBACK_FAILURE: AtomicU64 = AtomicU64::new(0);
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ArchiveStats {
+    pub upload_success: u64,
+    pub upload_failure: u64,
+    pub upload_retries: u64,
+    pub segments_dropped: u64,
+    pub cleanup_deleted: u64,
+    pub playback_success: u64,
+    pub playback_failure: u64,
+}
+
+pub fn stats() -> ArchiveStats {
+    ArchiveStats {
+        upload_success: UPLOAD_SUCCESS.load(Ordering::Relaxed),
+        upload_failure: UPLOAD_FAILURE.load(Ordering::Relaxed),
+        upload_retries: UPLOAD_RETRIES.load(Ordering::Relaxed),
+        segments_dropped: SEGMENTS_DROPPED.load(Ordering::Relaxed),
+        cleanup_deleted: CLEANUP_DELETED.load(Ordering::Relaxed),
+        playback_success: PLAYBACK_SUCCESS.load(Ordering::Relaxed),
+        playback_failure: PLAYBACK_FAILURE.load(Ordering::Relaxed),
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -188,15 +222,20 @@ impl RustFsArchive {
             match tokio::time::timeout(self.timeout, self.put(key, bytes.clone(), content_type))
                 .await
             {
-                Ok(Ok(())) => return Ok(()),
+                Ok(Ok(())) => {
+                    UPLOAD_SUCCESS.fetch_add(1, Ordering::Relaxed);
+                    return Ok(());
+                }
                 Ok(Err(error)) => last_error = Some(error),
                 Err(_) => last_error = Some(ArchiveError::Timeout(self.timeout)),
             }
             if attempt < self.retries {
+                UPLOAD_RETRIES.fetch_add(1, Ordering::Relaxed);
                 let backoff = Duration::from_millis(100 * (1u64 << attempt.min(5)));
                 tokio::time::sleep(backoff).await;
             }
         }
+        UPLOAD_FAILURE.fetch_add(1, Ordering::Relaxed);
         Err(last_error.unwrap_or_else(|| ArchiveError::S3("upload failed".to_string())))
     }
 
@@ -303,6 +342,7 @@ impl RustFsArchive {
             if expired {
                 self.delete(&object.key).await?;
                 deleted += 1;
+                CLEANUP_DELETED.fetch_add(1, Ordering::Relaxed);
             }
         }
         Ok(deleted)

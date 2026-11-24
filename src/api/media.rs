@@ -161,6 +161,13 @@ function currentTarget() {
   return { sim, channel };
 }
 
+function formatBytes(value) {
+  if (!value) { return '0 B'; }
+  if (value < 1024) { return value + ' B'; }
+  if (value < 1024 * 1024) { return (value / 1024).toFixed(1) + ' KB'; }
+  return (value / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
 async function downloadArchive(key) {
   const response = await fetch('/api/media/archive/' + key.split('/').map(encodeURIComponent).join('/'), { cache: 'no-store', headers: authHeaders() });
   if (!response.ok) { status.textContent = '归档下载不可用: ' + response.status; return; }
@@ -184,13 +191,20 @@ async function refreshArchive() {
   label.textContent = '查询中...';
   try {
     const response = await fetch('/api/media/archive?sim=' + encodeURIComponent(sim) + '&channel=' + encodeURIComponent(channel), { cache: 'no-store', headers: authHeaders() });
-    if (!response.ok) { label.textContent = '归档不可用: ' + response.status; return; }
+    if (!response.ok) {
+      if (response.status === 503) { label.textContent = '归档未启用或 RustFS 不可达'; }
+      else if (response.status === 401) { label.textContent = '登录已过期，请重新登录'; }
+      else { label.textContent = '归档查询失败: ' + response.status; }
+      return;
+    }
     const data = await response.json();
-    label.textContent = data.objects.length + ' 个对象';
-    for (const item of data.objects) {
+    const objects = (data.objects || []).slice().sort((a, b) => b.key.localeCompare(a.key));
+    label.textContent = objects.length + ' 个对象（最新在前）';
+    for (const item of objects) {
       const row = document.createElement('div');
       const name = document.createElement('span');
-      name.textContent = item.key + ' (' + item.size + ' bytes) ';
+      const stamp = item.modified_epoch ? new Date(item.modified_epoch * 1000).toLocaleString() + ' ' : '';
+      name.textContent = stamp + item.key + ' (' + formatBytes(item.size) + ') ';
       const play = document.createElement('button');
       play.textContent = '播放';
       play.onclick = () => playArchive(item.key);
@@ -374,15 +388,20 @@ pub async fn archive_playback(
     };
     let program = std::env::var("TSP_FFMPEG").unwrap_or_else(|_| "ffmpeg".to_string());
     let remuxer = FfmpegRemuxer::new(program);
-    let bytes = remuxer
-        .to_fmp4(Some(&video), audio.as_deref())
-        .map_err(|error| {
-            AppError::new(
+    let bytes = match remuxer.to_fmp4(Some(&video), audio.as_deref()) {
+        Ok(bytes) => {
+            archive::PLAYBACK_SUCCESS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            bytes
+        }
+        Err(error) => {
+            archive::PLAYBACK_FAILURE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            return Err(AppError::new(
                 StatusCode::SERVICE_UNAVAILABLE,
                 "archive_playback_failed",
                 format!("{error:?}"),
-            )
-        })?;
+            ));
+        }
+    };
     Ok(mp4_response(&bytes))
 }
 

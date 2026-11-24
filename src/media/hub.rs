@@ -206,6 +206,7 @@ impl Session {
         self.record_audio.clear();
         self.record_started = None;
         self.record_video_started = false;
+        archive::SEGMENTS_DROPPED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         tracing::warn!(%sim, channel, bytes, "dropped media segment without a keyframe");
     }
 

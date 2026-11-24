@@ -101,6 +101,55 @@ impl Metrics {
             "xingtu_jt808_downlinks_total {}\n",
             self.jt808_downlinks.load(Ordering::Relaxed)
         ));
+        let archive = crate::media::archive::stats();
+        out.push_str(
+            "# HELP xingtu_archive_upload_success_total RustFS segment uploads completed.\n",
+        );
+        out.push_str("# TYPE xingtu_archive_upload_success_total counter\n");
+        out.push_str(&format!(
+            "xingtu_archive_upload_success_total {}\n",
+            archive.upload_success
+        ));
+        out.push_str("# HELP xingtu_archive_upload_failure_total RustFS segment uploads failed after retries.\n");
+        out.push_str("# TYPE xingtu_archive_upload_failure_total counter\n");
+        out.push_str(&format!(
+            "xingtu_archive_upload_failure_total {}\n",
+            archive.upload_failure
+        ));
+        out.push_str("# HELP xingtu_archive_upload_retries_total RustFS upload retry attempts.\n");
+        out.push_str("# TYPE xingtu_archive_upload_retries_total counter\n");
+        out.push_str(&format!(
+            "xingtu_archive_upload_retries_total {}\n",
+            archive.upload_retries
+        ));
+        out.push_str("# HELP xingtu_archive_segments_dropped_total Media segments dropped without a keyframe.\n");
+        out.push_str("# TYPE xingtu_archive_segments_dropped_total counter\n");
+        out.push_str(&format!(
+            "xingtu_archive_segments_dropped_total {}\n",
+            archive.segments_dropped
+        ));
+        out.push_str(
+            "# HELP xingtu_archive_cleanup_deleted_total Expired RustFS objects deleted.\n",
+        );
+        out.push_str("# TYPE xingtu_archive_cleanup_deleted_total counter\n");
+        out.push_str(&format!(
+            "xingtu_archive_cleanup_deleted_total {}\n",
+            archive.cleanup_deleted
+        ));
+        out.push_str("# HELP xingtu_archive_playback_success_total Archived segments remuxed for playback.\n");
+        out.push_str("# TYPE xingtu_archive_playback_success_total counter\n");
+        out.push_str(&format!(
+            "xingtu_archive_playback_success_total {}\n",
+            archive.playback_success
+        ));
+        out.push_str(
+            "# HELP xingtu_archive_playback_failure_total Archived segment playback failures.\n",
+        );
+        out.push_str("# TYPE xingtu_archive_playback_failure_total counter\n");
+        out.push_str(&format!(
+            "xingtu_archive_playback_failure_total {}\n",
+            archive.playback_failure
+        ));
         out.push_str("# HELP xingtu_cluster_leader Whether this node owns scheduler leadership.\n");
         out.push_str("# TYPE xingtu_cluster_leader gauge\n");
         out.push_str(&format!(
@@ -122,4 +171,30 @@ impl Metrics {
 pub async fn count_http(State(state): State<AppState>, request: Request, next: Next) -> Response {
     state.metrics.http_requests.fetch_add(1, Ordering::Relaxed);
     next.run(request).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn render_includes_archive_counters() {
+        let metrics = Metrics::default();
+        let cluster = ClusterStatus {
+            enabled: false,
+            node_id: "test".to_string(),
+            leader: false,
+            redis_connected: false,
+            raft_enabled: false,
+            raft_node_id: None,
+            raft_leader: None,
+            raft_term: 0,
+            raft_state: "idle".to_string(),
+            raft_last_log: None,
+        };
+        let text = metrics.render(&cluster);
+        assert!(text.contains("xingtu_archive_upload_success_total"));
+        assert!(text.contains("xingtu_archive_segments_dropped_total"));
+        assert!(text.contains("xingtu_archive_playback_failure_total"));
+    }
 }

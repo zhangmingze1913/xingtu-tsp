@@ -215,6 +215,20 @@ Authorization: Bearer <token>
 
 依赖 AWS CLI v2；RustFS 需先启动。
 
+### 指标
+
+`/api/metrics` 新增：
+
+```text
+xingtu_archive_upload_success_total
+xingtu_archive_upload_failure_total
+xingtu_archive_upload_retries_total
+xingtu_archive_segments_dropped_total
+xingtu_archive_cleanup_deleted_total
+xingtu_archive_playback_success_total
+xingtu_archive_playback_failure_total
+```
+
 ### 代码位置
 
 ```text
@@ -232,6 +246,7 @@ src/lib.rs             启动时确保桶存在
 - `upload_retries_transient_s3_failures`
 - `cleanup_deletes_only_expired_objects`
 - `video_segments_start_at_keyframes`
+- `render_includes_archive_counters`
 - `archive_put_list_get_against_s3_mock`：真实 S3 客户端对 mock 发起 PUT/GET/ListObjectsV2
 
 未执行：

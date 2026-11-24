@@ -6,7 +6,7 @@
 ## 1. 验证结果
 
 ```text
-lib                    232 passed
+lib                    233 passed
 integration            32 passed
 fmt                    clean
 clippy                 clean
@@ -228,7 +228,7 @@ NotApplicable    7
 验证：
 
 ```text
-lib                    232 passed
+lib                    233 passed
 integration            32 passed
 fmt                    clean
 clippy -D warnings     clean
@@ -277,6 +277,7 @@ TSP_RUSTFS_SEGMENT_SECS/BYTES
 archive_put_list_get_against_s3_mock
 archive_playback_pairs_video_and_audio_keys
 upload_retries_transient_s3_failures
+render_includes_archive_counters
 media_keys_are_prefixed_and_path_safe
 prefix_and_segment_limits_have_safe_defaults
 ```
