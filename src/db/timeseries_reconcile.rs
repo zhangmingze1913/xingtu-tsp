@@ -169,8 +169,8 @@ impl Db {
         let result = self
             .query(
                 "UPDATE reconciliation_export_jobs
-                 SET status = 'running', rows_written = 0, file_path = NULL,
-                     error = NULL, updated_at = ?1
+                 SET status = 'running', rows_written = 0, cursor_ts = NULL,
+                     cursor_id = NULL, file_path = NULL, error = NULL, updated_at = ?1
                  WHERE id = ?2 AND status IN ('failed', 'cancelled')",
             )
             .bind(crate::util::now_iso())
@@ -192,6 +192,28 @@ impl Db {
             .execute(self.pool())
             .await?;
         Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn update_reconciliation_export_progress(
+        &self,
+        id: &str,
+        rows_written: i64,
+        cursor_ts: Option<&str>,
+        cursor_id: Option<&str>,
+    ) -> AppResult<()> {
+        self.query(
+            "UPDATE reconciliation_export_jobs
+             SET rows_written = ?1, cursor_ts = ?2, cursor_id = ?3, updated_at = ?4
+             WHERE id = ?5",
+        )
+        .bind(rows_written)
+        .bind(cursor_ts)
+        .bind(cursor_id)
+        .bind(crate::util::now_iso())
+        .bind(id)
+        .execute(self.pool())
+        .await?;
+        Ok(())
     }
 
     pub async fn prune_reconciliation_export_jobs_before(
@@ -225,7 +247,7 @@ impl Db {
         let row = self
             .query(
                 "SELECT id, status, org_name, vehicle_id, consistent, max_rows,
-                        rows_written, error, created_at, updated_at
+                        rows_written, cursor_ts, cursor_id, error, created_at, updated_at
                  FROM reconciliation_export_jobs WHERE id = ?1",
             )
             .bind(id)
@@ -239,9 +261,11 @@ impl Db {
             consistent: row.get::<Option<i64>, _>(4).map(|value| value != 0),
             max_rows: row.get::<i64, _>(5),
             rows_written: row.get::<i64, _>(6),
-            error: row.get::<Option<String>, _>(7),
-            created_at: row.get::<String, _>(8),
-            updated_at: row.get::<String, _>(9),
+            cursor_ts: row.get::<Option<String>, _>(7),
+            cursor_id: row.get::<Option<String>, _>(8),
+            error: row.get::<Option<String>, _>(9),
+            created_at: row.get::<String, _>(10),
+            updated_at: row.get::<String, _>(11),
         }))
     }
 }
@@ -455,5 +479,30 @@ mod tests {
             .expect("job");
         assert_eq!(job.status, "running");
         assert!(job.error.is_none());
+    }
+
+    #[tokio::test]
+    async fn export_job_progress_persists_cursor() {
+        let db = Db::in_memory().await.expect("db");
+        let id = db
+            .create_reconciliation_export_job("Org", None, None, 100)
+            .await
+            .expect("create");
+        db.update_reconciliation_export_progress(
+            &id,
+            50,
+            Some("2026-11-24T00:00:00Z"),
+            Some("row-50"),
+        )
+        .await
+        .expect("progress");
+        let job = db
+            .get_reconciliation_export_job(&id)
+            .await
+            .expect("get")
+            .expect("job");
+        assert_eq!(job.rows_written, 50);
+        assert_eq!(job.cursor_ts.as_deref(), Some("2026-11-24T00:00:00Z"));
+        assert_eq!(job.cursor_id.as_deref(), Some("row-50"));
     }
 }

@@ -224,6 +224,16 @@ impl Db {
              )",
         )
         .await?;
+        self.apply_migration(
+            "0024_reconciliation_export_cursor_ts",
+            "ALTER TABLE reconciliation_export_jobs ADD COLUMN cursor_ts VARCHAR(40)",
+        )
+        .await?;
+        self.apply_migration(
+            "0025_reconciliation_export_cursor_id",
+            "ALTER TABLE reconciliation_export_jobs ADD COLUMN cursor_id VARCHAR(64)",
+        )
+        .await?;
         Ok(())
     }
 

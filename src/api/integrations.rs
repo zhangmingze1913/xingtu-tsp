@@ -596,20 +596,54 @@ async fn run_reconciliation_export_inner(
     tokio::fs::create_dir_all(&dir)
         .await
         .map_err(|error| AppError::internal(format!("export dir: {error}")))?;
+    let job = state
+        .db
+        .get_reconciliation_export_job(id)
+        .await?
+        .ok_or_else(|| AppError::not_found("导出任务不存在"))?;
+    if job.status == "cancelled" {
+        return Ok(());
+    }
     let final_path = format!("{dir}/{id}.csv");
-    let tmp_path = format!("{final_path}.tmp");
-    tokio::fs::write(
-        &tmp_path,
-        "id,vehicle_id,org_name,from_ts,to_ts,pg_count,td_count,count_delta,consistent,checked_at\n",
-    )
-    .await
-    .map_err(|error| AppError::internal(format!("export header: {error}")))?;
-    let mut cursor: Option<(String, String)> = None;
-    let mut written = 0i64;
+    let mut written = job.rows_written.max(0);
+    let mut cursor = match (job.cursor_ts.clone(), job.cursor_id.clone()) {
+        (Some(ts), Some(cursor_id)) => Some((ts, cursor_id)),
+        _ => None,
+    };
+    let resume = written > 0
+        && tokio::fs::metadata(&final_path)
+            .await
+            .map(|meta| meta.len() > 0)
+            .unwrap_or(false);
+    use tokio::io::AsyncWriteExt;
+    let mut file = if resume {
+        tokio::fs::OpenOptions::new()
+            .append(true)
+            .open(&final_path)
+            .await
+            .map_err(|error| AppError::internal(format!("export open: {error}")))?
+    } else {
+        written = 0;
+        cursor = None;
+        let mut file = tokio::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&final_path)
+            .await
+            .map_err(|error| AppError::internal(format!("export create: {error}")))?;
+        file.write_all(
+            b"id,vehicle_id,org_name,from_ts,to_ts,pg_count,td_count,count_delta,consistent,checked_at\n",
+        )
+        .await
+        .map_err(|error| AppError::internal(format!("export header: {error}")))?;
+        file
+    };
     loop {
-        if let Ok(Some(job)) = state.db.get_reconciliation_export_job(id).await {
-            if job.status == "cancelled" {
-                let _ = tokio::fs::remove_file(&tmp_path).await;
+        if let Ok(Some(current)) = state.db.get_reconciliation_export_job(id).await {
+            if current.status == "cancelled" {
+                drop(file);
+                let _ = tokio::fs::remove_file(&final_path).await;
                 return Ok(());
             }
         }
@@ -633,12 +667,6 @@ async fn run_reconciliation_export_inner(
         for row in &page {
             chunk.push_str(&csv_row(row));
         }
-        use tokio::io::AsyncWriteExt;
-        let mut file = tokio::fs::OpenOptions::new()
-            .append(true)
-            .open(&tmp_path)
-            .await
-            .map_err(|error| AppError::internal(format!("export open: {error}")))?;
         file.write_all(chunk.as_bytes())
             .await
             .map_err(|error| AppError::internal(format!("export write: {error}")))?;
@@ -647,22 +675,31 @@ async fn run_reconciliation_export_inner(
         cursor = Some((last.checked_at.clone(), last.id.clone()));
         state
             .db
-            .update_reconciliation_export_job(id, "running", written, None, None)
+            .update_reconciliation_export_progress(
+                id,
+                written,
+                cursor.as_ref().map(|(ts, _)| ts.as_str()),
+                cursor.as_ref().map(|(_, row_id)| row_id.as_str()),
+            )
             .await?;
         if page.len() < remaining as usize || written >= max_rows {
             break;
         }
     }
-    if let Ok(Some(job)) = state.db.get_reconciliation_export_job(id).await {
-        if job.status == "cancelled" {
-            let _ = tokio::fs::remove_file(&tmp_path).await;
+    file.flush()
+        .await
+        .map_err(|error| AppError::internal(format!("export flush: {error}")))?;
+    if let Ok(Some(current)) = state.db.get_reconciliation_export_job(id).await {
+        if current.status == "cancelled" {
+            drop(file);
+            let _ = tokio::fs::remove_file(&final_path).await;
             return Ok(());
         }
     }
-    let _ = tokio::fs::remove_file(&final_path).await;
-    tokio::fs::rename(&tmp_path, &final_path)
-        .await
-        .map_err(|error| AppError::internal(format!("export rename: {error}")))?;
+    state
+        .db
+        .update_reconciliation_export_progress(id, written, None, None)
+        .await?;
     state
         .db
         .update_reconciliation_export_job(id, "completed", written, Some(&final_path), None)
@@ -786,5 +823,59 @@ pub async fn retry_reconciliation_export_job(
     });
     Ok(Json(
         json!({"id": id, "status": "running", "retried": true}),
+    ))
+}
+
+pub async fn resume_reconciliation_export_job(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<String>,
+) -> AppResult<Json<Value>> {
+    let job = state
+        .db
+        .get_reconciliation_export_job(&id)
+        .await?
+        .ok_or_else(|| AppError::not_found("导出任务不存在"))?;
+    if !user.is_admin() && job.org_name != user.org_name {
+        return Err(AppError::forbidden("无权恢复该导出任务"));
+    }
+    if job.status != "running" {
+        return Err(AppError::new(
+            StatusCode::CONFLICT,
+            "export_not_resumable",
+            "仅 running 任务可恢复",
+        ));
+    }
+    let stale_secs = std::env::var("TSP_RECONCILE_EXPORT_STALE_SECS")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(60)
+        .max(10);
+    let updated = chrono::DateTime::parse_from_rfc3339(&job.updated_at)
+        .map_err(|_| AppError::internal("导出任务时间戳无效"))?
+        .with_timezone(&chrono::Utc);
+    if (chrono::Utc::now() - updated).num_seconds() < stale_secs {
+        return Err(AppError::new(
+            StatusCode::CONFLICT,
+            "export_still_active",
+            "任务 recently active，暂不能恢复",
+        ));
+    }
+    crate::tdengine::EXPORT_JOBS_RESUMED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let worker_state = state.clone();
+    let worker_id = id.clone();
+    tokio::spawn(async move {
+        run_reconciliation_export(
+            worker_state,
+            worker_id,
+            Some(job.org_name),
+            job.vehicle_id,
+            job.consistent,
+            job.max_rows,
+        )
+        .await;
+    });
+    Ok(Json(
+        json!({"id": id, "status": "running", "resumed": true}),
     ))
 }

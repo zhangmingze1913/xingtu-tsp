@@ -141,6 +141,8 @@ pub struct ReconciliationExportJob {
     pub consistent: Option<bool>,
     pub max_rows: i64,
     pub rows_written: i64,
+    pub cursor_ts: Option<String>,
+    pub cursor_id: Option<String>,
     pub error: Option<String>,
     pub created_at: String,
     pub updated_at: String,
