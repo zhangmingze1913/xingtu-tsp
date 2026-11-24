@@ -252,6 +252,12 @@ fn spawn_reconciliation_export_cleanup(state: AppState) {
         ticker.tick().await;
         loop {
             ticker.tick().await;
+            let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            if let Ok(pruned) = state.db.prune_export_download_tokens(&now).await {
+                if pruned > 0 {
+                    tracing::info!(pruned, "pruned expired export download tokens");
+                }
+            }
             let cutoff = (chrono::Utc::now() - chrono::Duration::hours(hours))
                 .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
             let ids = match state

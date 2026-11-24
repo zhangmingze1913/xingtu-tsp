@@ -196,17 +196,33 @@ fn hmac_hex(secret: &str, body: &[u8]) -> String {
         .collect()
 }
 
-fn issue_export_token(job_id: &str) -> Option<(String, i64)> {
+fn issue_export_token_sync(job_id: &str, jti: &str) -> Option<(String, i64)> {
     let secret = export_token_secret()?;
     let ttl = export_token_ttl();
     let expires = chrono::Utc::now().timestamp() + ttl;
-    let payload = format!("{job_id}.{expires}");
+    let payload = format!("{job_id}.{expires}.{jti}");
     let encoded = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(payload.as_bytes());
     let signature = hmac_hex(&secret, encoded.as_bytes());
     Some((format!("{encoded}.{signature}"), ttl))
 }
 
-fn verify_export_token(token: &str) -> Option<String> {
+async fn issue_export_token(state: &AppState, job_id: &str) -> Option<(String, i64)> {
+    let jti = uuid::Uuid::new_v4().simple().to_string();
+    let (token, ttl) = issue_export_token_sync(job_id, &jti)?;
+    let expires_at = (chrono::Utc::now() + chrono::Duration::seconds(ttl))
+        .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    if state
+        .db
+        .create_export_download_token(&jti, job_id, &expires_at)
+        .await
+        .is_err()
+    {
+        return None;
+    }
+    Some((token, ttl))
+}
+
+fn verify_export_token(token: &str) -> Option<(String, String)> {
     let secret = export_token_secret()?;
     let (encoded, signature) = token.rsplit_once('.')?;
     let expected = hmac_hex(&secret, encoded.as_bytes());
@@ -217,11 +233,15 @@ fn verify_export_token(token: &str) -> Option<String> {
         .decode(encoded)
         .ok()?;
     let payload = String::from_utf8(decoded).ok()?;
-    let (job_id, expires) = payload.rsplit_once('.')?;
+    let (job_id, rest) = payload.split_once('.')?;
+    let (expires, jti) = rest.rsplit_once('.')?;
     if expires.parse::<i64>().ok()? < chrono::Utc::now().timestamp() {
         return None;
     }
-    Some(job_id.to_string())
+    if jti.is_empty() {
+        return None;
+    }
+    Some((job_id.to_string(), jti.to_string()))
 }
 
 fn parse_history_cursor(raw: Option<&str>) -> AppResult<Option<(&str, &str)>> {
@@ -848,7 +868,7 @@ pub async fn reconciliation_export_job(
     let mut value = serde_json::to_value(&job)
         .map_err(|error| AppError::internal(format!("job serialize: {error}")))?;
     if job.status == "completed" {
-        if let Some((token, ttl)) = issue_export_token(&id) {
+        if let Some((token, ttl)) = issue_export_token(&state, &id).await {
             value["download_token"] = json!(token);
             value["download_expires_in"] = json!(ttl);
         }
@@ -1032,8 +1052,12 @@ pub async fn download_reconciliation_export_by_token(
     State(state): State<AppState>,
     Path(token): Path<String>,
 ) -> AppResult<Response> {
-    let id = verify_export_token(&token)
+    let (id, jti) = verify_export_token(&token)
         .ok_or_else(|| AppError::unauthorized("下载令牌无效或已过期"))?;
+    let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    if !state.db.consume_export_download_token(&jti, &now).await? {
+        return Err(AppError::unauthorized("下载令牌已使用或已过期"));
+    }
     let job = state
         .db
         .get_reconciliation_export_job(&id)
@@ -1066,9 +1090,12 @@ mod token_tests {
     fn export_download_token_roundtrip() {
         std::env::set_var("TSP_EXPORT_TOKEN_SECRET", "test-export-secret");
         std::env::set_var("TSP_EXPORT_TOKEN_TTL_SECS", "60");
-        let (token, ttl) = issue_export_token("job-1").expect("token");
+        let (token, ttl) = issue_export_token_sync("job-1", "jti-1").expect("token");
         assert_eq!(ttl, 60);
-        assert_eq!(verify_export_token(&token).as_deref(), Some("job-1"));
+        assert_eq!(
+            verify_export_token(&token).map(|(job, _)| job).as_deref(),
+            Some("job-1")
+        );
         let mut tampered = token.clone();
         tampered.push('0');
         assert!(verify_export_token(&tampered).is_none());

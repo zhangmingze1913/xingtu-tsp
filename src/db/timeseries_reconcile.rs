@@ -246,6 +246,47 @@ impl Db {
         Ok(())
     }
 
+    pub async fn create_export_download_token(
+        &self,
+        jti: &str,
+        job_id: &str,
+        expires_at: &str,
+    ) -> AppResult<()> {
+        self.query(
+            "INSERT INTO export_download_tokens
+             (jti, job_id, expires_at, created_at) VALUES (?1, ?2, ?3, ?4)",
+        )
+        .bind(jti)
+        .bind(job_id)
+        .bind(expires_at)
+        .bind(crate::util::now_iso())
+        .execute(self.pool())
+        .await?;
+        Ok(())
+    }
+
+    pub async fn consume_export_download_token(&self, jti: &str, now: &str) -> AppResult<bool> {
+        let result = self
+            .query(
+                "UPDATE export_download_tokens SET used_at = ?1
+                 WHERE jti = ?2 AND used_at IS NULL AND expires_at > ?1",
+            )
+            .bind(now)
+            .bind(jti)
+            .execute(self.pool())
+            .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn prune_export_download_tokens(&self, cutoff: &str) -> AppResult<u64> {
+        let result = self
+            .query("DELETE FROM export_download_tokens WHERE expires_at < ?1")
+            .bind(cutoff)
+            .execute(self.pool())
+            .await?;
+        Ok(result.rows_affected())
+    }
+
     pub async fn expired_export_job_ids(&self, now: &str) -> AppResult<Vec<String>> {
         let rows = self
             .query(
@@ -623,5 +664,21 @@ mod tests {
             .await
             .expect("expired");
         assert_eq!(ids, vec![id]);
+    }
+
+    #[tokio::test]
+    async fn export_download_token_is_single_use() {
+        let db = Db::in_memory().await.expect("db");
+        db.create_export_download_token("jti-1", "job-1", "2999-01-01T00:00:00Z")
+            .await
+            .expect("create");
+        assert!(db
+            .consume_export_download_token("jti-1", "2026-11-24T00:00:00Z")
+            .await
+            .expect("first"));
+        assert!(!db
+            .consume_export_download_token("jti-1", "2026-11-24T00:00:00Z")
+            .await
+            .expect("replay"));
     }
 }

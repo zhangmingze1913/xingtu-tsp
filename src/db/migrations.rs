@@ -244,6 +244,23 @@ impl Db {
             "ALTER TABLE reconciliation_export_jobs ADD COLUMN lease_until VARCHAR(40)",
         )
         .await?;
+        self.apply_migration(
+            "0028_export_download_tokens",
+            "CREATE TABLE IF NOT EXISTS export_download_tokens (
+                 jti VARCHAR(64) PRIMARY KEY,
+                 job_id VARCHAR(64) NOT NULL,
+                 expires_at VARCHAR(40) NOT NULL,
+                 used_at VARCHAR(40),
+                 created_at VARCHAR(40) NOT NULL
+             )",
+        )
+        .await?;
+        self.apply_migration(
+            "0029_export_download_tokens_job_index",
+            "CREATE INDEX idx_export_download_tokens_job
+             ON export_download_tokens(job_id)",
+        )
+        .await?;
         Ok(())
     }
 

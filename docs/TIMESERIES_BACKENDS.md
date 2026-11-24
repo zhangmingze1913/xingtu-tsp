@@ -421,6 +421,8 @@ POST body：
 - 下载时自动 AES-256-GCM 解密；密钥缺失则下载失败
 - 完成任务的状态响应包含 `download_token`（默认 10 分钟）
 - 无登录下载：`GET /api/integrations/timeseries/reconciliations/export/download/{token}`
+- 令牌包含 jti，落库后仅可消费一次；重放返回 401
+- 过期令牌每小时清理
 - `failed` / `cancelled` 任务可重试，重置进度并重新执行
 - 重试前会覆盖旧 CSV，避免文件冲突
 - `running` 任务超过 `TSP_RECONCILE_EXPORT_STALE_SECS`（默认 60s）可手动 resume
