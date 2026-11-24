@@ -542,6 +542,7 @@ pub async fn start_reconciliation_export_job(
             max_rows,
         )
         .await?;
+    crate::tdengine::EXPORT_JOBS_STARTED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let worker_state = state.clone();
     let worker_id = id.clone();
     let worker_org = org_name.clone();
@@ -573,6 +574,7 @@ async fn run_reconciliation_export(
         run_reconciliation_export_inner(&state, &id, org_name, vehicle_id, consistent, max_rows)
             .await
     {
+        crate::tdengine::EXPORT_JOBS_FAILED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         tracing::warn!(%error, job = %id, "reconciliation export failed");
         let _ = state
             .db
@@ -605,6 +607,12 @@ async fn run_reconciliation_export_inner(
     let mut cursor: Option<(String, String)> = None;
     let mut written = 0i64;
     loop {
+        if let Ok(Some(job)) = state.db.get_reconciliation_export_job(id).await {
+            if job.status == "cancelled" {
+                let _ = tokio::fs::remove_file(&tmp_path).await;
+                return Ok(());
+            }
+        }
         let remaining = (max_rows - written).clamp(1, 500);
         let page = state
             .db
@@ -645,6 +653,12 @@ async fn run_reconciliation_export_inner(
             break;
         }
     }
+    if let Ok(Some(job)) = state.db.get_reconciliation_export_job(id).await {
+        if job.status == "cancelled" {
+            let _ = tokio::fs::remove_file(&tmp_path).await;
+            return Ok(());
+        }
+    }
     tokio::fs::rename(&tmp_path, &final_path)
         .await
         .map_err(|error| AppError::internal(format!("export rename: {error}")))?;
@@ -652,6 +666,7 @@ async fn run_reconciliation_export_inner(
         .db
         .update_reconciliation_export_job(id, "completed", written, Some(&final_path), None)
         .await?;
+    crate::tdengine::EXPORT_JOBS_COMPLETED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     Ok(())
 }
 
@@ -706,4 +721,29 @@ pub async fn download_reconciliation_export_job(
         )
         .body(Body::from(bytes))
         .map_err(|error| AppError::internal(format!("export response: {error}")))
+}
+
+pub async fn cancel_reconciliation_export_job(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<String>,
+) -> AppResult<Json<Value>> {
+    let job = state
+        .db
+        .get_reconciliation_export_job(&id)
+        .await?
+        .ok_or_else(|| AppError::not_found("导出任务不存在"))?;
+    if !user.is_admin() && job.org_name != user.org_name {
+        return Err(AppError::forbidden("无权取消该导出任务"));
+    }
+    if state.db.cancel_reconciliation_export_job(&id).await? {
+        crate::tdengine::EXPORT_JOBS_CANCELLED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    } else {
+        return Err(AppError::new(
+            StatusCode::CONFLICT,
+            "export_not_running",
+            "导出任务不在运行中",
+        ));
+    }
+    Ok(Json(json!({"id": id, "status": "cancelled"})))
 }

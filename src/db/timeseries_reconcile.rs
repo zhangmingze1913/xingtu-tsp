@@ -165,6 +165,20 @@ impl Db {
         Ok(())
     }
 
+    pub async fn cancel_reconciliation_export_job(&self, id: &str) -> AppResult<bool> {
+        let result = self
+            .query(
+                "UPDATE reconciliation_export_jobs
+                 SET status = 'cancelled', updated_at = ?1
+                 WHERE id = ?2 AND status = 'running'",
+            )
+            .bind(crate::util::now_iso())
+            .bind(id)
+            .execute(self.pool())
+            .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
     pub async fn prune_reconciliation_export_jobs_before(
         &self,
         cutoff: &str,
@@ -376,5 +390,28 @@ mod tests {
             .await
             .expect("get")
             .is_some());
+    }
+
+    #[tokio::test]
+    async fn export_job_cancel_only_running() {
+        let db = Db::in_memory().await.expect("db");
+        let id = db
+            .create_reconciliation_export_job("Org", None, None, 10)
+            .await
+            .expect("create");
+        assert!(db
+            .cancel_reconciliation_export_job(&id)
+            .await
+            .expect("cancel"));
+        assert!(!db
+            .cancel_reconciliation_export_job(&id)
+            .await
+            .expect("again"));
+        let job = db
+            .get_reconciliation_export_job(&id)
+            .await
+            .expect("get")
+            .expect("job");
+        assert_eq!(job.status, "cancelled");
     }
 }

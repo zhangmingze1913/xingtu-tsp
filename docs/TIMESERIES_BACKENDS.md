@@ -385,6 +385,7 @@ Grafana 仪表板：[deploy/grafana/tdengine-reconciliation-dashboard.json](../d
 POST /api/integrations/timeseries/reconciliations/export/jobs
 GET  /api/integrations/timeseries/reconciliations/export/jobs/{id}
 GET  /api/integrations/timeseries/reconciliations/export/jobs/{id}/download
+POST /api/integrations/timeseries/reconciliations/export/jobs/{id}/cancel
 ```
 
 POST body：
@@ -397,6 +398,8 @@ POST body：
 - 状态：`running` / `completed` / `failed`
 - 文件目录：`TSP_RECONCILE_EXPORT_DIR`
 - 非管理员只能访问本组织任务
+- worker 每页检查 `cancelled` 状态，取消后删除临时文件
+- 指标：`xingtu_reconcile_export_jobs_{started,completed,failed,cancelled}_total`
 - 进程重启时 `running` 任务不会自动恢复，需要重新提交
 - 已完成/失败任务默认保留 24 小时，每小时清理记录与文件
 - `TSP_RECONCILE_EXPORT_RETENTION_HOURS=0` 关闭清理

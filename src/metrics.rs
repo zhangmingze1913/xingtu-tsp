@@ -195,6 +195,32 @@ impl Metrics {
             archive.playback_cache_miss
         ));
         let tdengine = crate::tdengine::stats();
+        out.push_str("# HELP xingtu_reconcile_export_jobs_started_total Reconciliation export jobs started.\n");
+        out.push_str("# TYPE xingtu_reconcile_export_jobs_started_total counter\n");
+        out.push_str(&format!(
+            "xingtu_reconcile_export_jobs_started_total {}\n",
+            tdengine.export_jobs_started
+        ));
+        out.push_str("# HELP xingtu_reconcile_export_jobs_completed_total Reconciliation export jobs completed.\n");
+        out.push_str("# TYPE xingtu_reconcile_export_jobs_completed_total counter\n");
+        out.push_str(&format!(
+            "xingtu_reconcile_export_jobs_completed_total {}\n",
+            tdengine.export_jobs_completed
+        ));
+        out.push_str(
+            "# HELP xingtu_reconcile_export_jobs_failed_total Reconciliation export jobs failed.\n",
+        );
+        out.push_str("# TYPE xingtu_reconcile_export_jobs_failed_total counter\n");
+        out.push_str(&format!(
+            "xingtu_reconcile_export_jobs_failed_total {}\n",
+            tdengine.export_jobs_failed
+        ));
+        out.push_str("# HELP xingtu_reconcile_export_jobs_cancelled_total Reconciliation export jobs cancelled.\n");
+        out.push_str("# TYPE xingtu_reconcile_export_jobs_cancelled_total counter\n");
+        out.push_str(&format!(
+            "xingtu_reconcile_export_jobs_cancelled_total {}\n",
+            tdengine.export_jobs_cancelled
+        ));
         out.push_str(
             "# HELP xingtu_tdengine_history_pruned_total Reconciliation history rows pruned.\n",
         );
@@ -355,5 +381,6 @@ mod tests {
         assert!(text.contains("xingtu_tdengine_reconcile_checks_total"));
         assert!(text.contains("xingtu_tdengine_alert_sent_total"));
         assert!(text.contains("xingtu_tdengine_history_pruned_total"));
+        assert!(text.contains("xingtu_reconcile_export_jobs_started_total"));
     }
 }
