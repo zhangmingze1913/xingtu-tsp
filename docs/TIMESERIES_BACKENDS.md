@@ -235,6 +235,15 @@ Authorization: Bearer <admin-token>
 - `from/to` 必须是 RFC3339
 - 仅 admin 可调用
 - 这是计数/边界对账，不是逐点哈希
+- 结果写入 `timeseries_reconciliations` 表
+- 历史查询：
+
+```http
+GET /api/integrations/timeseries/reconciliations?limit=50
+```
+
+- `limit` 1–200，默认 50
+- 定时任务只持久化 mismatch，手动接口每次持久化
 - 指标：`xingtu_tdengine_reconcile_checks_total`、`xingtu_tdengine_reconcile_mismatches_total`
 
 定时对账：

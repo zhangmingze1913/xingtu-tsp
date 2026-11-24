@@ -93,6 +93,10 @@ pub fn build_router(state: AppState) -> Router {
             "/integrations/timeseries/reconcile",
             get(integrations::timeseries_reconcile),
         )
+        .route(
+            "/integrations/timeseries/reconciliations",
+            get(integrations::timeseries_reconciliations),
+        )
         .route("/terminals", get(terminals::list))
         .route("/terminals/export", get(terminals::export))
         .route("/terminals/{id}", get(terminals::get))

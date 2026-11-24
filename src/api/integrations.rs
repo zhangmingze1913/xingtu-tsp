@@ -121,7 +121,12 @@ pub async fn timeseries_reconcile(
     if delta != 0 {
         crate::tdengine::RECONCILE_MISMATCHES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
+    let id = state
+        .db
+        .record_timeseries_reconciliation(&query.vehicle_id, &from, &to, pg.count, td.count, delta)
+        .await?;
     Ok(Json(json!({
+        "id": id,
         "vehicle_id": query.vehicle_id,
         "from": from,
         "to": to,
@@ -131,4 +136,22 @@ pub async fn timeseries_reconcile(
         "consistent": delta == 0,
         "note": "count-based comparison; PG remains authoritative",
     })))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ReconcileHistoryQuery {
+    pub limit: Option<i64>,
+}
+
+pub async fn timeseries_reconciliations(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<ReconcileHistoryQuery>,
+) -> AppResult<Json<Value>> {
+    user.require_admin()?;
+    let rows = state
+        .db
+        .list_timeseries_reconciliations(query.limit.unwrap_or(50))
+        .await?;
+    Ok(Json(json!({"items": rows})))
 }

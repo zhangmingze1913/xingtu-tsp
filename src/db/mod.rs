@@ -63,6 +63,7 @@ mod telemetry_rules;
 mod telemetry_trip;
 pub mod terminal_profiles;
 mod terminals;
+mod timeseries_reconcile;
 pub mod trips;
 pub mod users;
 pub mod vehicles;

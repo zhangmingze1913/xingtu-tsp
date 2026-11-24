@@ -119,6 +119,19 @@ pub struct TelemetryPoint {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct TimeseriesReconciliation {
+    pub id: String,
+    pub vehicle_id: String,
+    pub from_ts: String,
+    pub to_ts: String,
+    pub pg_count: i64,
+    pub td_count: i64,
+    pub count_delta: i64,
+    pub consistent: bool,
+    pub checked_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct TelemetryRangeStats {
     pub count: i64,
     pub min_ts: Option<String>,

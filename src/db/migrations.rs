@@ -181,6 +181,27 @@ impl Db {
         .await?;
         self.apply_migration("0018_pii_vault_index", index_sql)
             .await?;
+        self.apply_migration(
+            "0020_timeseries_reconciliations",
+            "CREATE TABLE IF NOT EXISTS timeseries_reconciliations (
+                 id VARCHAR(64) PRIMARY KEY,
+                 vehicle_id VARCHAR(64) NOT NULL,
+                 from_ts VARCHAR(40) NOT NULL,
+                 to_ts VARCHAR(40) NOT NULL,
+                 pg_count BIGINT NOT NULL,
+                 td_count BIGINT NOT NULL,
+                 count_delta BIGINT NOT NULL,
+                 consistent INTEGER NOT NULL,
+                 checked_at VARCHAR(40) NOT NULL
+             )",
+        )
+        .await?;
+        self.apply_migration(
+            "0021_timeseries_reconciliations_time_index",
+            "CREATE INDEX idx_timeseries_reconciliations_time
+             ON timeseries_reconciliations(checked_at)",
+        )
+        .await?;
         Ok(())
     }
 
