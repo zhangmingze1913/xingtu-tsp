@@ -263,6 +263,7 @@ pub async fn timeseries_reconciliations_export(
     let org_name = scoped_history_org(&user, query.org_name.as_deref())?;
     let max_rows = query.limit.unwrap_or(2000).clamp(1, 5000) as usize;
     let footer = query.footer.unwrap_or(false);
+    let cursor = parse_history_cursor(query.cursor.as_deref())?;
     let exported = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let page_size = 500i64;
     let db = state.db.clone();
@@ -273,7 +274,7 @@ pub async fn timeseries_reconciliations_export(
         vehicle,
         org_name,
         consistent,
-        None::<(String, String)>,
+        cursor.map(|(checked_at, id)| (checked_at.to_string(), id.to_string())),
         0usize,
     );
     let rows = futures_util::stream::unfold(
