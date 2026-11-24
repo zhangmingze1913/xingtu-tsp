@@ -195,6 +195,32 @@ impl Metrics {
             archive.playback_cache_miss
         ));
         let tdengine = crate::tdengine::stats();
+        out.push_str("# HELP xingtu_tdengine_spooled_total TDengine samples persisted after retry exhaustion.\n");
+        out.push_str("# TYPE xingtu_tdengine_spooled_total counter\n");
+        out.push_str(&format!(
+            "xingtu_tdengine_spooled_total {}\n",
+            crate::tdengine_spool::SPOOLED.load(std::sync::atomic::Ordering::Relaxed)
+        ));
+        out.push_str("# HELP xingtu_tdengine_spool_replayed_total Spooled TDengine samples replayed successfully.\n");
+        out.push_str("# TYPE xingtu_tdengine_spool_replayed_total counter\n");
+        out.push_str(&format!(
+            "xingtu_tdengine_spool_replayed_total {}\n",
+            crate::tdengine_spool::REPLAYED.load(std::sync::atomic::Ordering::Relaxed)
+        ));
+        out.push_str(
+            "# HELP xingtu_tdengine_spool_pending Spooled TDengine samples waiting for replay.\n",
+        );
+        out.push_str("# TYPE xingtu_tdengine_spool_pending gauge\n");
+        out.push_str(&format!(
+            "xingtu_tdengine_spool_pending {}\n",
+            crate::tdengine_spool::SPOOL_PENDING.load(std::sync::atomic::Ordering::Relaxed)
+        ));
+        out.push_str("# HELP xingtu_tdengine_spool_failed_total TDengine spool write failures.\n");
+        out.push_str("# TYPE xingtu_tdengine_spool_failed_total counter\n");
+        out.push_str(&format!(
+            "xingtu_tdengine_spool_failed_total {}\n",
+            crate::tdengine_spool::SPOOL_FAILED.load(std::sync::atomic::Ordering::Relaxed)
+        ));
         out.push_str("# HELP xingtu_tdengine_writes_total TDengine samples written.\n");
         out.push_str("# TYPE xingtu_tdengine_writes_total counter\n");
         out.push_str(&format!(
@@ -279,5 +305,6 @@ mod tests {
         assert!(text.contains("xingtu_archive_spool_pending"));
         assert!(text.contains("xingtu_tdengine_writes_total"));
         assert!(text.contains("xingtu_tdengine_queue_depth"));
+        assert!(text.contains("xingtu_tdengine_spool_pending"));
     }
 }

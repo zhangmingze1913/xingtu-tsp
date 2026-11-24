@@ -65,6 +65,9 @@ TSP_TDENGINE_PASSWORD=taosdata
 TSP_TDENGINE_DATABASE=tsp
 TSP_TDENGINE_QUEUE_CAPACITY=8192
 TSP_TDENGINE_WRITE_RETRIES=3
+TSP_TDENGINE_SPOOL_DIR=data/tdengine-spool
+TSP_TDENGINE_SPOOL_MAX_FILES=100000
+TSP_TDENGINE_SPOOL_REPLAY_SECS=60
 ```
 
 `TSP_TDENGINE_URL` 必须是 taosAdapter 的 HTTP 地址，不是原生 6030 端口。
@@ -155,7 +158,10 @@ v_<sanitized_vehicle_id>
 - 有界队列：`TSP_TDENGINE_QUEUE_CAPACITY`（默认 8192）
 - 队列满：丢弃最新样本并告警，不阻塞 1078 接收
 - 单条写入失败：最多重试 `TSP_TDENGINE_WRITE_RETRIES` 次，指数退避
-- 重试耗尽：记录失败指标
+- 重试耗尽：写入磁盘 spool，后台重放
+- spool 每个样本一个 JSON 文件，成功后删除
+- `TSP_TDENGINE_SPOOL_MAX_FILES` 限制积压文件数
+
 - 指标：
 
 ```text
@@ -164,6 +170,10 @@ xingtu_tdengine_failures_total
 xingtu_tdengine_retries_total
 xingtu_tdengine_dropped_total
 xingtu_tdengine_queue_depth
+xingtu_tdengine_spooled_total
+xingtu_tdengine_spool_replayed_total
+xingtu_tdengine_spool_pending
+xingtu_tdengine_spool_failed_total
 ```
 
 ## 8. 一致性与限制
@@ -198,6 +208,8 @@ TDengine = 可重建的查询加速副本
 tdengine::tests::parses_timestamps_and_identifiers
 tdengine::tests::rest_query_maps_rows_to_points
 tdengine::tests::write_retries_transient_failures
+tdengine_spool::tests::spool_save_pending_remove_roundtrip
+tdengine_spool::tests::spool_enforces_max_files
 config::tests::parses_time_series_backends
 ```
 

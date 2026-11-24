@@ -65,6 +65,9 @@ data:
   TSP_TDENGINE_DATABASE: "tsp"
   TSP_TDENGINE_QUEUE_CAPACITY: "8192"
   TSP_TDENGINE_WRITE_RETRIES: "3"
+  TSP_TDENGINE_SPOOL_DIR: "/tmp/tdengine-spool"
+  TSP_TDENGINE_SPOOL_MAX_FILES: "100000"
+  TSP_TDENGINE_SPOOL_REPLAY_SECS: "60"
   # Optional Walrus durable event archive (length-prefixed TCP)
   TSP_WALRUS_ADDR: ""
   TSP_WALRUS_TOPIC: "tsp-events"

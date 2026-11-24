@@ -36,6 +36,7 @@ mod services;
 pub mod standards;
 pub mod state;
 mod tdengine;
+mod tdengine_spool;
 mod timeseries;
 mod util;
 mod walrus_bus;

@@ -14,6 +14,7 @@ use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 
 use chrono::{DateTime, Utc};
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::mpsc;
 
@@ -57,17 +58,17 @@ pub struct TdengineStore {
     database: String,
 }
 
-#[derive(Clone)]
-struct Sample {
-    vehicle_id: String,
-    ts_ms: i64,
-    lat: f64,
-    lon: f64,
-    speed: f64,
-    heading: f64,
-    ignition: bool,
-    soc: f64,
-    odometer_km: f64,
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct Sample {
+    pub(crate) vehicle_id: String,
+    pub(crate) ts_ms: i64,
+    pub(crate) lat: f64,
+    pub(crate) lon: f64,
+    pub(crate) speed: f64,
+    pub(crate) heading: f64,
+    pub(crate) ignition: bool,
+    pub(crate) soc: f64,
+    pub(crate) odometer_km: f64,
 }
 
 impl TdengineStore {
@@ -130,6 +131,23 @@ impl TdengineStore {
                 writer.write_sample_with_retry(&sample).await;
             }
         });
+        if crate::tdengine_spool::global().is_some() {
+            let replay = store.clone();
+            tokio::spawn(async move {
+                let interval = std::time::Duration::from_secs(
+                    crate::tdengine_spool::replay_interval_seconds(),
+                );
+                let mut ticker = tokio::time::interval(interval);
+                ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                loop {
+                    ticker.tick().await;
+                    let replayed = replay.replay_spool().await;
+                    if replayed > 0 {
+                        tracing::info!(replayed, "TDengine spool replay completed");
+                    }
+                }
+            });
+        }
         Ok(store)
     }
 
@@ -221,7 +239,7 @@ impl TdengineStore {
         Ok(points)
     }
 
-    async fn write_sample_with_retry(&self, sample: &Sample) {
+    async fn write_with_retry(&self, sample: &Sample) -> bool {
         let retries = std::env::var("TSP_TDENGINE_WRITE_RETRIES")
             .ok()
             .and_then(|value| value.parse::<u32>().ok())
@@ -231,7 +249,7 @@ impl TdengineStore {
             match self.write_sample(sample).await {
                 Ok(()) => {
                     WRITES.fetch_add(1, Ordering::Relaxed);
-                    return;
+                    return true;
                 }
                 Err(error) => {
                     if attempt < retries {
@@ -246,6 +264,39 @@ impl TdengineStore {
                 }
             }
         }
+        false
+    }
+
+    async fn write_sample_with_retry(&self, sample: &Sample) {
+        if self.write_with_retry(sample).await {
+            return;
+        }
+        if let Some(spool) = crate::tdengine_spool::global() {
+            match spool.save(sample).await {
+                Ok(()) => tracing::warn!(vehicle = %sample.vehicle_id, "TDengine sample spooled"),
+                Err(error) => {
+                    crate::tdengine_spool::SPOOL_FAILED.fetch_add(1, Ordering::Relaxed);
+                    tracing::warn!(%error, vehicle = %sample.vehicle_id, "TDengine spool write failed");
+                }
+            }
+        }
+    }
+
+    pub async fn replay_spool(&self) -> usize {
+        let Some(spool) = crate::tdengine_spool::global() else {
+            return 0;
+        };
+        let Ok(items) = spool.pending().await else {
+            return 0;
+        };
+        let mut replayed = 0;
+        for (id, sample) in items {
+            if self.write_with_retry(&sample).await && spool.remove(&id).await.is_ok() {
+                crate::tdengine_spool::REPLAYED.fetch_add(1, Ordering::Relaxed);
+                replayed += 1;
+            }
+        }
+        replayed
     }
 
     async fn write_sample(&self, sample: &Sample) -> AppResult<()> {
