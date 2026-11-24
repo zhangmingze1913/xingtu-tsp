@@ -126,6 +126,8 @@ TSP_RUSTFS_SEGMENT_BYTES=8388608
 TSP_RUSTFS_UPLOAD_RETRIES=3
 TSP_RUSTFS_UPLOAD_TIMEOUT_SECS=30
 TSP_RUSTFS_UPLOAD_CONCURRENCY=4
+TSP_RUSTFS_RETENTION_DAYS=0
+TSP_RUSTFS_CLEANUP_INTERVAL_SECS=3600
 ```
 
 `TSP_RUSTFS_ARCHIVE` 未开启时，录制和上传完全关闭，`MediaHub` 行为与之前一致。
@@ -151,6 +153,14 @@ TSP_RUSTFS_UPLOAD_CONCURRENCY=4
 media/{sim}/{channel}/YYYY/MM/DD/HHMMSS-{sequence}.h264
 media/{sim}/{channel}/YYYY/MM/DD/HHMMSS-{sequence}.aac
 ```
+
+### 归档清理
+
+- `TSP_RUSTFS_RETENTION_DAYS=0` 关闭清理
+- 大于 0 时按 S3 `LastModified` 删除过期对象
+- 启动后按 `TSP_RUSTFS_CLEANUP_INTERVAL_SECS` 周期执行
+- 没有 `LastModified` 的对象不会被删除
+- 只清理配置前缀下对象
 
 ### 归档 API
 
@@ -217,6 +227,7 @@ src/lib.rs             启动时确保桶存在
 - `prefix_and_segment_limits_have_safe_defaults`
 - `archive_playback_pairs_video_and_audio_keys`
 - `upload_retries_transient_s3_failures`
+- `cleanup_deletes_only_expired_objects`
 - `archive_put_list_get_against_s3_mock`：真实 S3 客户端对 mock 发起 PUT/GET/ListObjectsV2
 
 未执行：

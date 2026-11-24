@@ -25,6 +25,8 @@ services:
       TSP_RUSTFS_UPLOAD_RETRIES: "3"
       TSP_RUSTFS_UPLOAD_TIMEOUT_SECS: "30"
       TSP_RUSTFS_UPLOAD_CONCURRENCY: "4"
+      TSP_RUSTFS_RETENTION_DAYS: "0"
+      TSP_RUSTFS_CLEANUP_INTERVAL_SECS: "3600"
       RUST_LOG: xingtu_tsp=info
     depends_on:
       rustfs:

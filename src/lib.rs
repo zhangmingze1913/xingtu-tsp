@@ -75,6 +75,7 @@ pub async fn run(config: Config) -> AppResult<()> {
             }
         });
     }
+    spawn_archive_cleanup();
 
     spawn_offline_sweeper(state.clone());
     spawn_retention_sweeper(state.clone());
@@ -204,6 +205,32 @@ pub(crate) fn spawn_jt808_kick_subscriber(cluster: &Cluster) {
                 "JT808 session moved; cancelling local connection"
             );
             jt808::cancel_terminal_session(phone);
+        }
+    });
+}
+
+fn spawn_archive_cleanup() {
+    let days = crate::media::archive::retention_days();
+    if days == 0 {
+        return;
+    }
+    let Some(archive) = crate::media::archive::global().cloned() else {
+        return;
+    };
+    let interval = Duration::from_secs(crate::media::archive::cleanup_interval_seconds());
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(interval);
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        ticker.tick().await;
+        loop {
+            ticker.tick().await;
+            match archive.cleanup_expired(days as i64 * 86_400).await {
+                Ok(0) => {}
+                Ok(deleted) => {
+                    tracing::info!(deleted, retention_days = days, "RustFS archive cleanup")
+                }
+                Err(error) => tracing::warn!(%error, "RustFS archive cleanup failed"),
+            }
         }
     });
 }

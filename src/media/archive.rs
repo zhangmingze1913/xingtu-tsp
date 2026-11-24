@@ -38,6 +38,8 @@ pub enum ArchiveError {
 pub struct ArchivedObject {
     pub key: String,
     pub size: i64,
+    /// LastModified as Unix seconds when S3 reports it.
+    pub modified_epoch: Option<i64>,
 }
 
 #[derive(Clone)]
@@ -239,25 +241,71 @@ impl RustFsArchive {
     }
 
     pub async fn list_prefix(&self, prefix: &str) -> Result<Vec<ArchivedObject>, ArchiveError> {
-        let output = self
-            .client
-            .list_objects_v2()
-            .bucket(&self.bucket)
-            .prefix(prefix)
-            .max_keys(1000)
-            .send()
-            .await
-            .map_err(|error| ArchiveError::S3(error.to_string()))?;
-        Ok(output
-            .contents()
-            .iter()
-            .filter_map(|object| {
+        let mut objects = Vec::new();
+        let mut token: Option<String> = None;
+        loop {
+            let mut request = self
+                .client
+                .list_objects_v2()
+                .bucket(&self.bucket)
+                .prefix(prefix)
+                .max_keys(1000);
+            if let Some(token) = token.as_deref() {
+                request = request.continuation_token(token);
+            }
+            let output = request
+                .send()
+                .await
+                .map_err(|error| ArchiveError::S3(error.to_string()))?;
+            objects.extend(output.contents().iter().filter_map(|object| {
                 Some(ArchivedObject {
                     key: object.key()?.to_string(),
                     size: object.size().unwrap_or_default(),
+                    modified_epoch: object.last_modified().map(|value| value.secs()),
                 })
-            })
-            .collect())
+            }));
+            if !output.is_truncated().unwrap_or(false) {
+                break;
+            }
+            token = output.next_continuation_token().map(str::to_string);
+            if token.is_none() {
+                break;
+            }
+        }
+        Ok(objects)
+    }
+
+    pub async fn delete(&self, key: &str) -> Result<(), ArchiveError> {
+        self.validate_key(key)?;
+        self.client
+            .delete_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .send()
+            .await
+            .map_err(|error| ArchiveError::S3(error.to_string()))?;
+        Ok(())
+    }
+
+    /// Delete objects older than `retention_seconds`; returns the delete count.
+    pub async fn cleanup_expired(&self, retention_seconds: i64) -> Result<usize, ArchiveError> {
+        if retention_seconds <= 0 {
+            return Ok(0);
+        }
+        let cutoff = Utc::now().timestamp() - retention_seconds;
+        let prefix = format!("{}/", self.prefix);
+        let mut deleted = 0;
+        for object in self.list_prefix(&prefix).await? {
+            let expired = object
+                .modified_epoch
+                .map(|modified| modified < cutoff)
+                .unwrap_or(false);
+            if expired {
+                self.delete(&object.key).await?;
+                deleted += 1;
+            }
+        }
+        Ok(deleted)
     }
 
     pub async fn get(&self, key: &str) -> Result<Vec<u8>, ArchiveError> {
@@ -320,6 +368,14 @@ pub fn segment_bytes() -> usize {
         .and_then(|value| value.parse().ok())
         .filter(|value: &usize| *value >= 64 * 1024)
         .unwrap_or(8 * 1024 * 1024)
+}
+
+pub fn retention_days() -> u32 {
+    env_u32("TSP_RUSTFS_RETENTION_DAYS", 0, 0, 3650)
+}
+
+pub fn cleanup_interval_seconds() -> u64 {
+    env_u32("TSP_RUSTFS_CLEANUP_INTERVAL_SECS", 3600, 60, 86_400) as u64
 }
 
 fn env_u32(name: &str, default: u32, min: u32, max: u32) -> u32 {
@@ -547,5 +603,85 @@ mod tests {
             .expect("retry succeeds");
         assert_eq!(state.puts.load(Ordering::SeqCst), 3);
         assert_eq!(state.objects.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn cleanup_deletes_only_expired_objects() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            routing::{delete, get},
+            Router,
+        };
+
+        type Objects = Arc<std::sync::Mutex<std::collections::HashMap<String, (Vec<u8>, i64)>>>;
+
+        async fn list_objects(State(objects): State<Objects>) -> String {
+            let objects = objects.lock().unwrap();
+            let contents: String = objects
+                .iter()
+                .map(|(key, (bytes, epoch))| {
+                    let stamp = chrono::DateTime::<chrono::Utc>::from_timestamp(*epoch, 0)
+                        .unwrap()
+                        .format("%Y-%m-%dT%H:%M:%S.000Z");
+                    format!(
+                        "<Contents><Key>{key}</Key><LastModified>{stamp}</LastModified>\
+                         <ETag>\"etag\"</ETag><Size>{}</Size>\
+                         <StorageClass>STANDARD</StorageClass></Contents>",
+                        bytes.len()
+                    )
+                })
+                .collect();
+            format!(
+                "<ListBucketResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
+                 <Name>tsp-media</Name><Prefix></Prefix><KeyCount>{}</KeyCount>\
+                 <MaxKeys>1000</MaxKeys><IsTruncated>false</IsTruncated>{contents}</ListBucketResult>",
+                objects.len()
+            )
+        }
+
+        async fn delete_object(
+            State(objects): State<Objects>,
+            Path(key): Path<String>,
+        ) -> StatusCode {
+            objects.lock().unwrap().remove(&key);
+            StatusCode::NO_CONTENT
+        }
+
+        let now = chrono::Utc::now().timestamp();
+        let objects: Objects = Arc::new(std::sync::Mutex::new(
+            [
+                ("media/1/1/old.h264".to_string(), (vec![0u8; 3], now - 7200)),
+                ("media/1/1/new.h264".to_string(), (vec![0u8; 3], now - 60)),
+            ]
+            .into_iter()
+            .collect(),
+        ));
+        let app = Router::new()
+            .route("/tsp-media/", get(list_objects).with_state(objects.clone()))
+            .route(
+                "/tsp-media/{*key}",
+                delete(delete_object).with_state(objects.clone()),
+            );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        let archive = RustFsArchive::from_parts(
+            &format!("http://{addr}"),
+            "tsp-media",
+            "access",
+            "secret",
+            "us-east-1",
+            "media",
+        )
+        .expect("archive");
+        assert_eq!(archive.cleanup_expired(3600).await.expect("cleanup"), 1);
+        let left = objects.lock().unwrap();
+        assert_eq!(left.len(), 1);
+        assert!(left.contains_key("media/1/1/new.h264"));
     }
 }
