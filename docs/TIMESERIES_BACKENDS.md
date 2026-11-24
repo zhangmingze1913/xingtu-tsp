@@ -342,6 +342,8 @@ POST /api/integrations/timeseries/spool/replay
 
 生产多副本、保留、监控与故障处理见 [TIMESERIES_OPERATIONS.md](TIMESERIES_OPERATIONS.md)。
 
+Grafana 仪表板：[deploy/grafana/tdengine-reconciliation-dashboard.json](../deploy/grafana/tdengine-reconciliation-dashboard.json)。
+
 ## 11. 容量/压测脚本
 
 ```powershell

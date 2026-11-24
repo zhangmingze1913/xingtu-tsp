@@ -123,6 +123,21 @@ xingtu_tdengine_reconcile_mismatches_total
 | `reconcile_mismatches_total` | 增长 | 查双写延迟/丢失 |
 | `tdengine_ready` | false | 检查 REST/集群 |
 
+Grafana 仪表板：
+
+```text
+deploy/grafana/tdengine-reconciliation-dashboard.json
+```
+
+导入 Grafana 后选择 Prometheus 数据源，包含：
+
+- 对账 checks/mismatches
+- 队列深度
+- spool pending / replay
+- 告警 sent/failed/skipped
+- 写入/失败/重试
+- 丢弃与历史清理
+
 TDengine 自身：
 
 - `taosKeeper` + Prometheus
