@@ -835,10 +835,12 @@ mod tests {
             Router,
         };
 
+        type LastSeen = Option<(Option<String>, Vec<u8>)>;
+
         #[derive(Clone)]
         struct StateData {
             attempts: Arc<AtomicUsize>,
-            last: Arc<Mutex<Option<(Option<String>, Vec<u8>)>>>,
+            last: Arc<Mutex<LastSeen>>,
         }
 
         async fn alert(
