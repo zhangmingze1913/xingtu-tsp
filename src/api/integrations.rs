@@ -152,6 +152,8 @@ pub async fn timeseries_reconcile(
 #[derive(Debug, Deserialize)]
 pub struct ReconcileHistoryQuery {
     pub limit: Option<i64>,
+    pub vehicle_id: Option<String>,
+    pub consistent: Option<bool>,
 }
 
 pub async fn timeseries_reconciliations(
@@ -162,7 +164,11 @@ pub async fn timeseries_reconciliations(
     user.require_admin()?;
     let rows = state
         .db
-        .list_timeseries_reconciliations(query.limit.unwrap_or(50))
+        .list_timeseries_reconciliations(
+            query.limit.unwrap_or(50),
+            query.vehicle_id.as_deref(),
+            query.consistent,
+        )
         .await?;
     Ok(Json(json!({"items": rows})))
 }

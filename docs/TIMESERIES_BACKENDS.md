@@ -72,6 +72,7 @@ TSP_TIMESERIES_RECONCILE_ENABLED=true
 TSP_TIMESERIES_RECONCILE_SECS=300
 TSP_TIMESERIES_RECONCILE_WINDOW_MINUTES=15
 TSP_TIMESERIES_RECONCILE_MAX_VEHICLES=100
+TSP_TIMESERIES_RECONCILE_HISTORY_DAYS=90
 TSP_RECONCILE_ALERT_WEBHOOK=https://alerts.example/hooks/tdengine
 TSP_RECONCILE_ALERT_COOLDOWN_SECS=300
 TSP_RECONCILE_ALERT_RETRIES=2
@@ -248,6 +249,8 @@ GET /api/integrations/timeseries/reconciliations?limit=50
 ```
 
 - `limit` 1–200，默认 50
+- 可选 `vehicle_id`、`consistent=true|false` 过滤
+- 历史默认保留 90 天，每 6 小时清理；`0` 关闭
 - 定时任务只持久化 mismatch，手动接口每次持久化
 - mismatch 可推送 JSON webhook；全局冷却默认 300s
 - 失败重试 2 次（`TSP_RECONCILE_ALERT_RETRIES`）

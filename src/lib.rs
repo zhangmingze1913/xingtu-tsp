@@ -79,6 +79,7 @@ pub async fn run(config: Config) -> AppResult<()> {
     spawn_archive_cleanup();
     spawn_archive_spool_replay();
     spawn_tdengine_reconciler(state.clone());
+    spawn_timeseries_history_pruner(state.clone());
 
     spawn_offline_sweeper(state.clone());
     spawn_retention_sweeper(state.clone());
@@ -208,6 +209,35 @@ pub(crate) fn spawn_jt808_kick_subscriber(cluster: &Cluster) {
                 "JT808 session moved; cancelling local connection"
             );
             jt808::cancel_terminal_session(phone);
+        }
+    });
+}
+
+fn spawn_timeseries_history_pruner(state: AppState) {
+    let days = std::env::var("TSP_TIMESERIES_RECONCILE_HISTORY_DAYS")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(90);
+    if days <= 0 {
+        return;
+    }
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(Duration::from_secs(6 * 3600));
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        ticker.tick().await;
+        loop {
+            ticker.tick().await;
+            let cutoff = (chrono::Utc::now() - chrono::Duration::days(days))
+                .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            match state
+                .db
+                .prune_timeseries_reconciliations_before(&cutoff)
+                .await
+            {
+                Ok(0) => {}
+                Ok(deleted) => tracing::info!(deleted, days, "pruned reconciliation history"),
+                Err(error) => tracing::warn!(%error, "reconciliation history prune failed"),
+            }
         }
     });
 }
