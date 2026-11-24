@@ -264,6 +264,15 @@ GET /api/integrations/timeseries/reconciliations/export?vehicle_id=...&org_name=
 
 - 复用 `limit`（最大 5000，默认 2000）、`vehicle_id`、`org_name`、`consistent` 过滤
 - 行数据按 500 行/页 keyset 查询并流式输出，避免全量加载
+- 分页下载协议：
+
+```http
+GET /api/integrations/timeseries/reconciliations/export/page?limit=500&cursor=<checked_at>|<id>
+```
+
+- 响应头：`X-Row-Count`、`X-Next-Cursor`（仅满页返回）
+- 非法 `cursor` 返回 400
+- CSV 行仍做字段转义
 - CSV 字段做引号转义
 - CSV 含 `org_name` 列
 - `Content-Type: text/csv`

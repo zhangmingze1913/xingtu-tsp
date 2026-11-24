@@ -164,6 +164,19 @@ pub async fn timeseries_reconcile(
     })))
 }
 
+fn parse_history_cursor(raw: Option<&str>) -> AppResult<Option<(&str, &str)>> {
+    let Some(raw) = raw else {
+        return Ok(None);
+    };
+    let (checked_at, id) = raw
+        .split_once('|')
+        .ok_or_else(|| AppError::bad_request("cursor 必须是 checked_at|id"))?;
+    if checked_at.is_empty() || id.is_empty() {
+        return Err(AppError::bad_request("cursor 的 checked_at/id 不能为空"));
+    }
+    Ok(Some((checked_at, id)))
+}
+
 fn scoped_history_org(user: &AuthUser, requested: Option<&str>) -> AppResult<Option<String>> {
     if user.is_admin() {
         return Ok(requested.map(str::to_string));
@@ -189,10 +202,7 @@ pub async fn timeseries_reconciliations(
     Query(query): Query<ReconcileHistoryQuery>,
 ) -> AppResult<Json<Value>> {
     let org_name = scoped_history_org(&user, query.org_name.as_deref())?;
-    let before = query
-        .cursor
-        .as_deref()
-        .and_then(|cursor| cursor.split_once('|'));
+    let before = parse_history_cursor(query.cursor.as_deref())?;
     let rows = state
         .db
         .list_timeseries_reconciliations_page(
@@ -322,6 +332,56 @@ pub async fn timeseries_reconciliations_export(
         .map_err(|error| AppError::internal(format!("CSV response: {error}")))
 }
 
+pub async fn timeseries_reconciliations_export_page(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<ReconcileHistoryQuery>,
+) -> AppResult<Response> {
+    let org_name = scoped_history_org(&user, query.org_name.as_deref())?;
+    let before = parse_history_cursor(query.cursor.as_deref())?;
+    let limit = query.limit.unwrap_or(500).clamp(1, 500);
+    let rows = state
+        .db
+        .list_timeseries_reconciliations_page(
+            limit,
+            before,
+            query.vehicle_id.as_deref(),
+            org_name.as_deref(),
+            query.consistent,
+        )
+        .await?;
+    let mut csv = String::from(
+        "id,vehicle_id,org_name,from_ts,to_ts,pg_count,td_count,count_delta,consistent,checked_at\n",
+    );
+    for row in &rows {
+        csv.push_str(&csv_row(row));
+    }
+    let next_cursor = if rows.len() as i64 == limit {
+        rows.last()
+            .map(|row| format!("{}|{}", row.checked_at, row.id))
+    } else {
+        None
+    };
+    let mut response = Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "text/csv; charset=utf-8")
+        .header(
+            header::CONTENT_DISPOSITION,
+            "attachment; filename=\"timeseries-reconciliations-page.csv\"",
+        )
+        .header("X-Row-Count", rows.len().to_string())
+        .body(Body::from(csv))
+        .map_err(|error| AppError::internal(format!("CSV page response: {error}")))?;
+    if let Some(cursor) = next_cursor {
+        response.headers_mut().insert(
+            "X-Next-Cursor",
+            axum::http::HeaderValue::from_str(&cursor)
+                .map_err(|_| AppError::internal("invalid next cursor"))?,
+        );
+    }
+    Ok(response)
+}
+
 fn csv_field(value: &str) -> String {
     if value.contains([',', '"', '\n', '\r']) {
         format!("\"{}\"", value.replace('"', "\"\""))
@@ -418,5 +478,19 @@ mod tests {
             jti: "j".to_string(),
         };
         assert!(scoped_history_org(&unbound, None).is_err());
+    }
+
+    #[test]
+    fn cursor_parser_rejects_malformed_values() {
+        assert!(parse_history_cursor(None).unwrap().is_none());
+        assert_eq!(
+            parse_history_cursor(Some("2026-11-24T00:00:00Z|abc"))
+                .unwrap()
+                .unwrap(),
+            ("2026-11-24T00:00:00Z", "abc")
+        );
+        assert!(parse_history_cursor(Some("missing")).is_err());
+        assert!(parse_history_cursor(Some("|abc")).is_err());
+        assert!(parse_history_cursor(Some("ts|")).is_err());
     }
 }
