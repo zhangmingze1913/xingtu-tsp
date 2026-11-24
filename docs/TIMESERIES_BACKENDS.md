@@ -379,7 +379,24 @@ Grafana 仪表板：[deploy/grafana/tdengine-reconciliation-dashboard.json](../d
 
 注意：这是 bounded smoke benchmark，不是生产容量认证；结果取决于机型、磁盘、网络和 TDengine 版本。
 
-## 12. 测试
+## 12. 客户端分页导出
+
+```powershell
+.\scripts\export-reconciliations.ps1 -Url http://127.0.0.1:8090 -OutFile reconciliations.csv
+```
+
+- 自动登录获取 token
+- 循环调用 `export/page`
+- 校验每页 `X-Row-Count`
+- 按 `X-Next-Cursor` 继续
+- 默认最多 5000 行
+- 若系统禁止脚本执行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\export-reconciliations.ps1
+```
+
+## 13. 测试
 
 代码侧测试：
 
