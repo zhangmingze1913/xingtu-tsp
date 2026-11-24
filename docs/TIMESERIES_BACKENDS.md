@@ -84,11 +84,14 @@ curl http://127.0.0.1:8090/api/health
 {
   "database": true,
   "timeseries_backend": "tdengine",
-  "tdengine": true
+  "tdengine": true,
+  "tdengine_ready": true
 }
 ```
 
-`tdengine=false` 表示未启用或初始化失败。
+`tdengine=false` 表示未启用或初始化失败；`tdengine_ready` 是实时 `SELECT SERVER_VERSION()` 探测结果。
+
+当 `TSP_TIMESERIES_BACKEND=tdengine` 时，`/api/ready` 会要求 TDengine 探测成功；`dual` 模式不阻塞就绪。
 
 ## 4. Docker Compose
 

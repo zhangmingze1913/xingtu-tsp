@@ -245,6 +245,11 @@ impl TdengineStore {
         Ok(points)
     }
 
+    /// Lightweight liveness query used by health/readiness probes.
+    pub async fn ping(&self) -> AppResult<()> {
+        self.exec("SELECT SERVER_VERSION()").await.map(|_| ())
+    }
+
     pub async fn range_stats(
         &self,
         vehicle_id: &str,

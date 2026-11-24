@@ -5,6 +5,11 @@ use crate::{models::HealthResponse, state::AppState, util::now_iso};
 pub(crate) async fn health(State(state): State<AppState>) -> impl IntoResponse {
     let database = state.db.ping().await.is_ok();
     let cluster = state.cluster.status();
+    let tdengine_ready = if let Some(tdengine) = &state.tdengine {
+        Some(tdengine.ping().await.is_ok())
+    } else {
+        None
+    };
     let body = HealthResponse {
         status: if database { "ok" } else { "degraded" },
         version: env!("CARGO_PKG_VERSION"),
@@ -13,6 +18,7 @@ pub(crate) async fn health(State(state): State<AppState>) -> impl IntoResponse {
         cluster_leader: cluster.leader,
         timeseries_backend: state.config.timeseries_backend.as_str().to_string(),
         tdengine: state.tdengine.is_some(),
+        tdengine_ready,
         timestamp: now_iso(),
     };
     let status = if database {
@@ -26,7 +32,14 @@ pub(crate) async fn health(State(state): State<AppState>) -> impl IntoResponse {
 pub(crate) async fn ready(State(state): State<AppState>) -> impl IntoResponse {
     let database = state.db.ping().await.is_ok();
     let cluster = state.cluster.status();
-    let ready = database;
+    let tdengine_ready = if let Some(tdengine) = &state.tdengine {
+        Some(tdengine.ping().await.is_ok())
+    } else {
+        None
+    };
+    let tdengine_required =
+        state.config.timeseries_backend == crate::config::TimeSeriesBackend::Tdengine;
+    let ready = database && (!tdengine_required || tdengine_ready == Some(true));
     let status = if ready {
         StatusCode::OK
     } else {
@@ -41,6 +54,7 @@ pub(crate) async fn ready(State(state): State<AppState>) -> impl IntoResponse {
             "cluster_leader": cluster.leader,
             "timeseries_backend": state.config.timeseries_backend.as_str(),
             "tdengine": state.tdengine.is_some(),
+            "tdengine_ready": tdengine_ready,
         })),
     )
 }
