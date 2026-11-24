@@ -21,6 +21,7 @@ mod cluster;
 pub mod config;
 pub mod db;
 pub mod error;
+mod export_crypto;
 mod iggy_bus;
 pub mod jt808;
 pub mod media;
@@ -270,7 +271,7 @@ fn spawn_reconciliation_export_cleanup(state: AppState) {
             let dir = std::env::var("TSP_RECONCILE_EXPORT_DIR")
                 .unwrap_or_else(|_| "data/reconcile-exports".to_string());
             for id in &ids {
-                for suffix in [".csv", ".csv.tmp"] {
+                for suffix in [".csv", ".csv.tmp", ".csv.enc"] {
                     let _ = tokio::fs::remove_file(format!("{dir}/{id}{suffix}")).await;
                 }
             }

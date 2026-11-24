@@ -677,6 +677,8 @@ async fn run_reconciliation_export_inner(
         return Ok(());
     }
     let final_path = format!("{dir}/{id}.csv");
+    let encrypted_path = format!("{final_path}.enc");
+    let _ = tokio::fs::remove_file(&encrypted_path).await;
     let mut written = job.rows_written.max(0);
     let mut cursor = match (job.cursor_ts.clone(), job.cursor_id.clone()) {
         (Some(ts), Some(cursor_id)) => Some((ts, cursor_id)),
@@ -790,13 +792,44 @@ async fn run_reconciliation_export_inner(
         .db
         .update_reconciliation_export_progress(id, written, None, None)
         .await?;
+    let stored_path = if let Some(key) = crate::export_crypto::key_from_env() {
+        let plaintext = tokio::fs::read(&final_path)
+            .await
+            .map_err(|error| AppError::internal(format!("export read for encryption: {error}")))?;
+        let encrypted = crate::export_crypto::encrypt(&key, &plaintext)?;
+        tokio::fs::write(&encrypted_path, encrypted)
+            .await
+            .map_err(|error| AppError::internal(format!("export encrypt write: {error}")))?;
+        let _ = tokio::fs::remove_file(&final_path).await;
+        encrypted_path
+    } else {
+        final_path
+    };
     state
         .db
-        .update_reconciliation_export_job(id, "completed", written, Some(&final_path), None)
+        .update_reconciliation_export_job(id, "completed", written, Some(&stored_path), None)
         .await?;
     let _ = state.db.release_export_lease(id, &lease_owner).await;
     crate::tdengine::EXPORT_JOBS_COMPLETED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     Ok(())
+}
+
+async fn read_export_csv(id: &str) -> AppResult<Vec<u8>> {
+    let dir = std::env::var("TSP_RECONCILE_EXPORT_DIR")
+        .unwrap_or_else(|_| "data/reconcile-exports".to_string());
+    let encrypted_path = format!("{dir}/{id}.csv.enc");
+    if tokio::fs::metadata(&encrypted_path).await.is_ok() {
+        let key = crate::export_crypto::key_from_env().ok_or_else(|| {
+            AppError::internal("导出文件已加密，但未配置 TSP_EXPORT_ENCRYPTION_KEY")
+        })?;
+        let encoded = tokio::fs::read(&encrypted_path)
+            .await
+            .map_err(|error| AppError::internal(format!("export read: {error}")))?;
+        return crate::export_crypto::decrypt(&key, &encoded);
+    }
+    tokio::fs::read(format!("{dir}/{id}.csv"))
+        .await
+        .map_err(|error| AppError::internal(format!("export read: {error}")))
 }
 
 pub async fn reconciliation_export_job(
@@ -843,12 +876,7 @@ pub async fn download_reconciliation_export_job(
             "导出任务尚未完成",
         ));
     }
-    let dir = std::env::var("TSP_RECONCILE_EXPORT_DIR")
-        .unwrap_or_else(|_| "data/reconcile-exports".to_string());
-    let file_path = format!("{dir}/{id}.csv");
-    let bytes = tokio::fs::read(&file_path)
-        .await
-        .map_err(|error| AppError::internal(format!("export read: {error}")))?;
+    let bytes = read_export_csv(&id).await?;
     Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "text/csv; charset=utf-8")
@@ -1018,11 +1046,7 @@ pub async fn download_reconciliation_export_by_token(
             "导出任务尚未完成",
         ));
     }
-    let dir = std::env::var("TSP_RECONCILE_EXPORT_DIR")
-        .unwrap_or_else(|_| "data/reconcile-exports".to_string());
-    let bytes = tokio::fs::read(format!("{dir}/{id}.csv"))
-        .await
-        .map_err(|error| AppError::internal(format!("export read: {error}")))?;
+    let bytes = read_export_csv(&id).await?;
     Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "text/csv; charset=utf-8")
