@@ -10,7 +10,10 @@
 //!   TSP_TDENGINE_PASSWORD=taosdata
 //!   TSP_TDENGINE_DATABASE=tsp
 
-use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
+use std::sync::{
+    atomic::{AtomicI64, AtomicU64, Ordering},
+    OnceLock,
+};
 
 use chrono::{DateTime, Utc};
 use hmac::{Hmac, Mac};
@@ -62,6 +65,29 @@ pub fn stats() -> TdengineStats {
         alerts_sent: ALERTS_SENT.load(Ordering::Relaxed),
         alerts_failed: ALERTS_FAILED.load(Ordering::Relaxed),
         alerts_skipped: ALERTS_SKIPPED.load(Ordering::Relaxed),
+    }
+}
+
+#[derive(Default)]
+struct AlertCooldown {
+    last: std::sync::Mutex<std::collections::HashMap<String, i64>>,
+}
+
+impl AlertCooldown {
+    fn allow_at(&self, key: &str, now: i64, cooldown: i64) -> bool {
+        let Ok(mut last) = self.last.lock() else {
+            return true;
+        };
+        if last.len() > 1024 {
+            last.retain(|_, at| now - *at < cooldown);
+        }
+        if let Some(previous) = last.get(key) {
+            if now - *previous < cooldown {
+                return false;
+            }
+        }
+        last.insert(key.to_string(), now);
+        true
     }
 }
 
@@ -446,13 +472,18 @@ pub async fn notify_reconcile_mismatch(
         .and_then(|value| value.parse::<i64>().ok())
         .unwrap_or(300)
         .max(1);
-    static LAST_ALERT: AtomicI64 = AtomicI64::new(0);
+    static COOLDOWN: OnceLock<AlertCooldown> = OnceLock::new();
+    let scope = std::env::var("TSP_RECONCILE_ALERT_COOLDOWN_SCOPE")
+        .unwrap_or_else(|_| "global".to_string());
+    let key = if scope.eq_ignore_ascii_case("vehicle") {
+        vehicle_id
+    } else {
+        "*"
+    };
     let now = Utc::now().timestamp();
-    let previous = LAST_ALERT.load(Ordering::Relaxed);
-    if now - previous < cooldown
-        || LAST_ALERT
-            .compare_exchange(previous, now, Ordering::Relaxed, Ordering::Relaxed)
-            .is_err()
+    if !COOLDOWN
+        .get_or_init(AlertCooldown::default)
+        .allow_at(key, now, cooldown)
     {
         ALERTS_SKIPPED.fetch_add(1, Ordering::Relaxed);
         return;
@@ -900,5 +931,16 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("delta=2"));
+    }
+
+    #[test]
+    fn alert_cooldown_respects_scope_and_window() {
+        let cooldown = AlertCooldown::default();
+        assert!(cooldown.allow_at("v1", 100, 300));
+        assert!(!cooldown.allow_at("v1", 101, 300));
+        assert!(cooldown.allow_at("v2", 101, 300));
+        assert!(cooldown.allow_at("v1", 401, 300));
+        assert!(cooldown.allow_at("*", 100, 300));
+        assert!(!cooldown.allow_at("*", 200, 300));
     }
 }

@@ -184,7 +184,7 @@ NotApplicable    7
 ## 6. 测试结果
 
 ```text
-lib                    253 passed
+lib                    254 passed
 integration            32 passed
 fmt                    clean
 clippy                 clean
