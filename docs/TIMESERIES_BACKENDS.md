@@ -68,6 +68,10 @@ TSP_TDENGINE_WRITE_RETRIES=3
 TSP_TDENGINE_SPOOL_DIR=data/tdengine-spool
 TSP_TDENGINE_SPOOL_MAX_FILES=100000
 TSP_TDENGINE_SPOOL_REPLAY_SECS=60
+TSP_TIMESERIES_RECONCILE_ENABLED=true
+TSP_TIMESERIES_RECONCILE_SECS=300
+TSP_TIMESERIES_RECONCILE_WINDOW_MINUTES=15
+TSP_TIMESERIES_RECONCILE_MAX_VEHICLES=100
 ```
 
 `TSP_TDENGINE_URL` 必须是 taosAdapter 的 HTTP 地址，不是原生 6030 端口。
@@ -204,6 +208,13 @@ Authorization: Bearer <admin-token>
 - 仅 admin 可调用
 - 这是计数/边界对账，不是逐点哈希
 - 指标：`xingtu_tdengine_reconcile_checks_total`、`xingtu_tdengine_reconcile_mismatches_total`
+
+定时对账：
+
+- 默认启用（`tdengine`/`dual`）
+- 仅集群 leader 执行
+- 每 5 分钟检查最近 15 分钟活跃车辆（最多 100 台）
+- 不一致写 warn 日志并累加 mismatch 指标
 
 ## 9. 一致性与限制
 

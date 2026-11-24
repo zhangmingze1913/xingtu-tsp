@@ -37,6 +37,24 @@ impl Db {
         })
     }
 
+    pub async fn recent_telemetry_vehicle_ids(
+        &self,
+        since: &str,
+        limit: i64,
+    ) -> AppResult<Vec<String>> {
+        let sql = self.sql(
+            "SELECT DISTINCT vehicle_id FROM telemetry WHERE ts >= ?1 \
+             ORDER BY vehicle_id LIMIT ?2",
+        );
+        let rows = self
+            .query(&sql)
+            .bind(since)
+            .bind(limit.clamp(1, 1000))
+            .fetch_all(self.pool())
+            .await?;
+        Ok(rows.iter().map(|row| row.get::<String, _>(0)).collect())
+    }
+
     pub async fn telemetry_exists(&self, vehicle_id: &str, ts: &str) -> AppResult<bool> {
         let sql = self.sql("SELECT COUNT(*) FROM telemetry WHERE vehicle_id = ?1 AND ts = ?2");
         let row = self
@@ -225,5 +243,59 @@ impl Db {
         let sql = self.sql("DELETE FROM telemetry WHERE ts < ?1");
         let result = self.query(&sql).bind(cutoff).execute(self.pool()).await?;
         Ok(result.rows_affected())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{CreateVehicleRequest, LocationSample};
+
+    #[tokio::test]
+    async fn recent_ids_and_range_stats_cover_ingested_samples() {
+        let db = Db::in_memory().await.expect("db");
+        db.create_vehicle(CreateVehicleRequest {
+            vin: "LSVAA000000000001".to_string(),
+            plate_no: "沪A00001".to_string(),
+            model: "EV".to_string(),
+            color: "white".to_string(),
+            energy_type: "EV".to_string(),
+            driver_name: "Driver".to_string(),
+            driver_phone: "13800138000".to_string(),
+            org_name: "Org".to_string(),
+        })
+        .await
+        .expect("vehicle");
+        let vehicle_id = db
+            .find_vehicle_id_by_vin("LSVAA000000000001")
+            .await
+            .expect("lookup")
+            .expect("id");
+        db.ingest_location(LocationSample {
+            vehicle_id: vehicle_id.clone(),
+            ts: "2026-11-24T08:00:00Z".to_string(),
+            lat: 31.2,
+            lon: 121.4,
+            speed: 50.0,
+            heading: 90.0,
+            ignition: true,
+            soc: Some(80.0),
+            odometer_km: Some(100.0),
+            source: "test".to_string(),
+            extra_json: None,
+        })
+        .await
+        .expect("ingest");
+        let ids = db
+            .recent_telemetry_vehicle_ids("2026-11-24T00:00:00Z", 10)
+            .await
+            .expect("ids");
+        assert!(ids.contains(&vehicle_id));
+        let stats = db
+            .telemetry_range_stats(&vehicle_id, "2026-11-24T00:00:00Z", "2026-11-25T00:00:00Z")
+            .await
+            .expect("stats");
+        assert_eq!(stats.count, 1);
+        assert_eq!(stats.min_ts.as_deref(), Some("2026-11-24T08:00:00Z"));
     }
 }

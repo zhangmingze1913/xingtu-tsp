@@ -78,6 +78,7 @@ pub async fn run(config: Config) -> AppResult<()> {
     }
     spawn_archive_cleanup();
     spawn_archive_spool_replay();
+    spawn_tdengine_reconciler(state.clone());
 
     spawn_offline_sweeper(state.clone());
     spawn_retention_sweeper(state.clone());
@@ -207,6 +208,103 @@ pub(crate) fn spawn_jt808_kick_subscriber(cluster: &Cluster) {
                 "JT808 session moved; cancelling local connection"
             );
             jt808::cancel_terminal_session(phone);
+        }
+    });
+}
+
+fn spawn_tdengine_reconciler(state: AppState) {
+    if state.tdengine.is_none()
+        || state.config.timeseries_backend == crate::config::TimeSeriesBackend::Postgres
+    {
+        return;
+    }
+    let enabled = std::env::var("TSP_TIMESERIES_RECONCILE_ENABLED")
+        .map(|value| !matches!(value.as_str(), "0" | "false" | "off"))
+        .unwrap_or(true);
+    if !enabled {
+        return;
+    }
+    let interval_secs = std::env::var("TSP_TIMESERIES_RECONCILE_SECS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .map(|value| value.clamp(60, 86_400))
+        .unwrap_or(300);
+    let window_minutes = std::env::var("TSP_TIMESERIES_RECONCILE_WINDOW_MINUTES")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .map(|value| value.clamp(1, 1440))
+        .unwrap_or(15);
+    let max_vehicles = std::env::var("TSP_TIMESERIES_RECONCILE_MAX_VEHICLES")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .map(|value| value.clamp(1, 1000))
+        .unwrap_or(100);
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(Duration::from_secs(interval_secs));
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        ticker.tick().await;
+        loop {
+            ticker.tick().await;
+            if state.cluster.enabled() && !state.cluster.is_leader() {
+                continue;
+            }
+            let to = chrono::Utc::now();
+            let from = to - chrono::Duration::minutes(window_minutes);
+            let from = from.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            let to = to.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            let ids = match state
+                .db
+                .recent_telemetry_vehicle_ids(&from, max_vehicles)
+                .await
+            {
+                Ok(ids) => ids,
+                Err(error) => {
+                    tracing::warn!(%error, "TDengine reconciliation vehicle query failed");
+                    continue;
+                }
+            };
+            let Some(tdengine) = state.tdengine.as_ref() else {
+                continue;
+            };
+            let mut mismatches = 0;
+            for id in &ids {
+                let pg = match state.db.telemetry_range_stats(id, &from, &to).await {
+                    Ok(stats) => stats,
+                    Err(error) => {
+                        tracing::warn!(%error, vehicle = %id, "PG reconciliation query failed");
+                        continue;
+                    }
+                };
+                let td = match tdengine.range_stats(id, &from, &to).await {
+                    Ok(stats) => stats,
+                    Err(error) => {
+                        tracing::warn!(%error, vehicle = %id, "TDengine reconciliation query failed");
+                        continue;
+                    }
+                };
+                crate::tdengine::RECONCILE_CHECKS
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                let delta = pg.count - td.count;
+                if delta != 0 {
+                    mismatches += 1;
+                    crate::tdengine::RECONCILE_MISMATCHES
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    tracing::warn!(
+                        vehicle = %id,
+                        pg = pg.count,
+                        tdengine = td.count,
+                        delta,
+                        "TDengine/PG reconciliation mismatch"
+                    );
+                }
+            }
+            if mismatches > 0 {
+                tracing::warn!(
+                    vehicles = ids.len(),
+                    mismatches,
+                    "TDengine reconciliation completed with mismatches"
+                );
+            }
         }
     });
 }
