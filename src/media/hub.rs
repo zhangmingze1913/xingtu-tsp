@@ -24,6 +24,7 @@ struct Session {
     record_video: Vec<u8>,
     record_audio: Vec<u8>,
     record_started: Option<Instant>,
+    record_video_started: bool,
     record_sequence: u64,
 }
 
@@ -74,16 +75,20 @@ impl MediaHub {
         if archive::global().is_some() {
             let is_video = matches!(packet.data_type, 0 | 1 | 2 | 4);
             let is_audio = packet.data_type == 3;
-            if is_video || is_audio {
+            if is_video {
                 let keyframe = packet.data_type == 0;
-                let overdue = session.record_started.is_some_and(|started| {
-                    started.elapsed().as_secs() >= archive::segment_seconds() * 2
-                });
-                let audio_only = session.record_video.is_empty();
-                if session.record_should_flush() && (keyframe || overdue || audio_only) {
+                if keyframe && (session.record_due() || session.record_over_hard_cap()) {
                     session.flush_record(&sim, packet.channel);
                 }
-                session.record_frame(&frame.annex_b, is_video);
+                if !keyframe && session.record_over_hard_cap() {
+                    session.drop_record(&sim, packet.channel);
+                }
+                session.record_frame(&frame.annex_b, true, keyframe);
+            } else if is_audio {
+                if session.record_video.is_empty() && session.record_due() {
+                    session.flush_record(&sim, packet.channel);
+                }
+                session.record_frame(&frame.annex_b, false, false);
             }
         }
         session.updated = Some(Instant::now());
@@ -155,11 +160,11 @@ impl MediaHub {
 }
 
 impl Session {
-    fn record_should_flush(&self) -> bool {
-        self.record_should_flush_for(archive::segment_seconds(), archive::segment_bytes())
+    fn record_due(&self) -> bool {
+        self.record_due_for(archive::segment_seconds(), archive::segment_bytes())
     }
 
-    fn record_should_flush_for(&self, seconds: u64, bytes: usize) -> bool {
+    fn record_due_for(&self, seconds: u64, bytes: usize) -> bool {
         let Some(started) = self.record_started else {
             return false;
         };
@@ -167,7 +172,23 @@ impl Session {
             || self.record_video.len() + self.record_audio.len() >= bytes
     }
 
-    fn record_frame(&mut self, frame: &[u8], is_video: bool) {
+    fn record_over_hard_cap(&self) -> bool {
+        self.record_video.len() + self.record_audio.len() >= archive::segment_max_bytes()
+    }
+
+    fn record_bytes(&self) -> usize {
+        self.record_video.len() + self.record_audio.len()
+    }
+
+    /// Append media. Video frames before the first keyframe are discarded so a
+    /// segment never begins mid-GOP.
+    fn record_frame(&mut self, frame: &[u8], is_video: bool, keyframe: bool) -> bool {
+        if is_video && !self.record_video_started {
+            if !keyframe {
+                return false;
+            }
+            self.record_video_started = true;
+        }
         if self.record_started.is_none() {
             self.record_started = Some(Instant::now());
         }
@@ -176,12 +197,23 @@ impl Session {
         } else {
             self.record_audio.extend_from_slice(frame);
         }
+        true
+    }
+
+    fn drop_record(&mut self, sim: &str, channel: u8) {
+        let bytes = self.record_bytes();
+        self.record_video.clear();
+        self.record_audio.clear();
+        self.record_started = None;
+        self.record_video_started = false;
+        tracing::warn!(%sim, channel, bytes, "dropped media segment without a keyframe");
     }
 
     fn flush_record(&mut self, sim: &str, channel: u8) {
         let video = std::mem::take(&mut self.record_video);
         let audio = std::mem::take(&mut self.record_audio);
         self.record_started = None;
+        self.record_video_started = false;
         if video.is_empty() && audio.is_empty() {
             return;
         }
@@ -276,11 +308,26 @@ mod tests {
     #[test]
     fn recording_segments_flush_on_time_or_size() {
         let mut session = Session::default();
-        assert!(!session.record_should_flush_for(30, 1024));
+        assert!(!session.record_due_for(30, 1024));
         session.record_started = Some(Instant::now());
         session.record_video = vec![0u8; 1024];
-        assert!(session.record_should_flush_for(1, 1024));
-        assert!(session.record_should_flush_for(30, 1024));
-        assert!(!session.record_should_flush_for(30, 2048));
+        assert!(session.record_due_for(1, 1024));
+        assert!(session.record_due_for(30, 1024));
+        assert!(!session.record_due_for(30, 2048));
+    }
+
+    #[test]
+    fn video_segments_start_at_keyframes() {
+        let mut session = Session::default();
+        assert!(!session.record_frame(&[0x41, 0x01], true, false));
+        assert!(session.record_video.is_empty());
+        assert!(session.record_frame(&[0x65, 0x88], true, true));
+        assert_eq!(session.record_video.len(), 2);
+        assert!(session.record_frame(&[0x41, 0x02], true, false));
+        assert_eq!(session.record_video.len(), 4);
+        session.flush_record("sim", 1);
+        assert!(!session.record_frame(&[0x41, 0x03], true, false));
+        assert!(session.record_video.is_empty());
+        assert!(session.record_frame(&[0x65, 0x99], true, true));
     }
 }

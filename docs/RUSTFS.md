@@ -123,6 +123,7 @@ TSP_RUSTFS_SECRET_KEY=rustfsadmin
 TSP_RUSTFS_PREFIX=media
 TSP_RUSTFS_SEGMENT_SECS=30
 TSP_RUSTFS_SEGMENT_BYTES=8388608
+TSP_RUSTFS_SEGMENT_MAX_BYTES=67108864
 TSP_RUSTFS_UPLOAD_RETRIES=3
 TSP_RUSTFS_UPLOAD_TIMEOUT_SECS=30
 TSP_RUSTFS_UPLOAD_CONCURRENCY=4
@@ -140,8 +141,10 @@ TSP_RUSTFS_CLEANUP_INTERVAL_SECS=3600
 - 视频：H.264 Annex-B，`video/h264`
 - 音频：AAC ADTS，`audio/aac`
 - 分段触发：
+  - 视频段只从 I 帧开始，首个 I 帧前的视频帧丢弃
   - 遇到 I 帧且达到 `TSP_RUSTFS_SEGMENT_SECS` 或 `TSP_RUSTFS_SEGMENT_BYTES`
-  - 超过 2 倍时间上限时兜底切分
+  - 没有 I 帧导致缓冲超过 `TSP_RUSTFS_SEGMENT_MAX_BYTES` 时丢弃并告警
+  - 音频流达到时间/大小时独立切分
   - 会话 `DELETE` 时强制冲刷
 - 会话 `clear` 会触发当前分段上传
 - 上传异步执行，不阻塞 1078 接收循环
@@ -228,6 +231,7 @@ src/lib.rs             启动时确保桶存在
 - `archive_playback_pairs_video_and_audio_keys`
 - `upload_retries_transient_s3_failures`
 - `cleanup_deletes_only_expired_objects`
+- `video_segments_start_at_keyframes`
 - `archive_put_list_get_against_s3_mock`：真实 S3 客户端对 mock 发起 PUT/GET/ListObjectsV2
 
 未执行：

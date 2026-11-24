@@ -362,6 +362,14 @@ pub fn segment_seconds() -> u64 {
         .unwrap_or(30)
 }
 
+pub fn segment_max_bytes() -> usize {
+    std::env::var("TSP_RUSTFS_SEGMENT_MAX_BYTES")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|value: &usize| *value >= 1024 * 1024)
+        .unwrap_or(64 * 1024 * 1024)
+}
+
 pub fn segment_bytes() -> usize {
     std::env::var("TSP_RUSTFS_SEGMENT_BYTES")
         .ok()
