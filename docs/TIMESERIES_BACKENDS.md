@@ -229,7 +229,26 @@ TDengine = 可重建的查询加速副本
 - TDengine 写入延迟与失败指标
 - 保留策略与磁盘容量规划
 
-## 10. 测试
+## 10. 真实 TDengine 联调脚本
+
+```powershell
+.\scripts\tdengine-smoke.ps1
+```
+
+执行：
+
+- `SELECT SERVER_VERSION()` 连通性检查
+- 创建数据库/超级表
+- 插入一条样本
+- 按车辆标签查询 COUNT
+
+参数：
+
+```powershell
+.\scripts\tdengine-smoke.ps1 -Url http://127.0.0.1:6041 -Database tsp
+```
+
+## 11. 测试
 
 代码侧测试：
 
