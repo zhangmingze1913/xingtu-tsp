@@ -457,16 +457,9 @@ pub async fn notify_reconcile_mismatch(
         ALERTS_SKIPPED.fetch_add(1, Ordering::Relaxed);
         return;
     }
-    let payload = serde_json::json!({
-        "type": "tdengine_reconcile_mismatch",
-        "vehicle_id": vehicle_id,
-        "from": from,
-        "to": to,
-        "pg_count": pg_count,
-        "tdengine_count": td_count,
-        "count_delta": delta,
-        "checked_at": Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-    });
+    let format =
+        std::env::var("TSP_RECONCILE_ALERT_FORMAT").unwrap_or_else(|_| "generic".to_string());
+    let payload = alert_payload(&format, vehicle_id, from, to, pg_count, td_count, delta);
     match send_webhook(url.trim(), &payload).await {
         Ok(()) => {
             ALERTS_SENT.fetch_add(1, Ordering::Relaxed);
@@ -520,6 +513,46 @@ pub(crate) async fn send_webhook_signed(
         }
     }
     Err(AppError::internal(last_error))
+}
+
+pub(crate) fn alert_payload(
+    format: &str,
+    vehicle_id: &str,
+    from: &str,
+    to: &str,
+    pg_count: i64,
+    td_count: i64,
+    delta: i64,
+) -> Value {
+    let checked_at = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    if format.eq_ignore_ascii_case("alertmanager") {
+        serde_json::json!([{
+            "labels": {
+                "alertname": "TdengineReconcileMismatch",
+                "severity": "warning",
+                "service": "xingtu-tsp",
+                "vehicle_id": vehicle_id,
+            },
+            "annotations": {
+                "summary": "TDengine/PostgreSQL reconciliation mismatch",
+                "description": format!(
+                    "vehicle={vehicle_id} pg={pg_count} tdengine={td_count} delta={delta} window={from}..{to}"
+                ),
+            },
+            "startsAt": checked_at,
+        }])
+    } else {
+        serde_json::json!({
+            "type": "tdengine_reconcile_mismatch",
+            "vehicle_id": vehicle_id,
+            "from": from,
+            "to": to,
+            "pg_count": pg_count,
+            "tdengine_count": td_count,
+            "count_delta": delta,
+            "checked_at": checked_at,
+        })
+    }
 }
 
 pub(crate) fn webhook_signature(secret: &str, body: &[u8]) -> String {
@@ -850,5 +883,20 @@ mod tests {
             serde_json::from_slice::<serde_json::Value>(&body).unwrap()["delta"],
             3
         );
+    }
+
+    #[test]
+    fn alert_payload_supports_generic_and_alertmanager() {
+        let generic = alert_payload("generic", "v1", "a", "b", 10, 8, 2);
+        assert_eq!(generic["type"], "tdengine_reconcile_mismatch");
+        assert_eq!(generic["count_delta"], 2);
+        let am = alert_payload("alertmanager", "v1", "a", "b", 10, 8, 2);
+        let item = &am.as_array().expect("array")[0];
+        assert_eq!(item["labels"]["alertname"], "TdengineReconcileMismatch");
+        assert_eq!(item["labels"]["vehicle_id"], "v1");
+        assert!(item["annotations"]["description"]
+            .as_str()
+            .unwrap()
+            .contains("delta=2"));
     }
 }
