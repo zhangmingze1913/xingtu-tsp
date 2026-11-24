@@ -287,7 +287,29 @@ TDengine = 可重建的查询加速副本
 .\scripts\tdengine-smoke.ps1 -Url http://127.0.0.1:6041 -Database tsp
 ```
 
-## 11. 测试
+## 11. 容量/压测脚本
+
+```powershell
+.\scripts\tdengine-bench.ps1
+```
+
+可选参数：
+
+```powershell
+.\scripts\tdengine-bench.ps1 -Vehicles 100 -SamplesPerVehicle 600 -BatchSize 100
+.\scripts\tdengine-bench.ps1 -Cleanup
+```
+
+输出：
+
+- 写入行数与 rows/s
+- 全表 COUNT 延迟
+- 单车辆范围查询延迟
+- 可选删除压测库
+
+注意：这是 bounded smoke benchmark，不是生产容量认证；结果取决于机型、磁盘、网络和 TDengine 版本。
+
+## 12. 测试
 
 代码侧测试：
 
