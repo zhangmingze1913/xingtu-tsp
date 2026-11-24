@@ -48,6 +48,9 @@ services:
       TSP_RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin}
       TSP_RUSTFS_PREFIX: media
       TSP_RUSTFS_SEGMENT_SECS: "30"
+      TSP_RUSTFS_UPLOAD_RETRIES: "3"
+      TSP_RUSTFS_UPLOAD_TIMEOUT_SECS: "30"
+      TSP_RUSTFS_UPLOAD_CONCURRENCY: "4"
       RUST_LOG: xingtu_tsp=info
     depends_on:
       postgres:

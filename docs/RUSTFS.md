@@ -123,6 +123,9 @@ TSP_RUSTFS_SECRET_KEY=rustfsadmin
 TSP_RUSTFS_PREFIX=media
 TSP_RUSTFS_SEGMENT_SECS=30
 TSP_RUSTFS_SEGMENT_BYTES=8388608
+TSP_RUSTFS_UPLOAD_RETRIES=3
+TSP_RUSTFS_UPLOAD_TIMEOUT_SECS=30
+TSP_RUSTFS_UPLOAD_CONCURRENCY=4
 ```
 
 `TSP_RUSTFS_ARCHIVE` 未开启时，录制和上传完全关闭，`MediaHub` 行为与之前一致。
@@ -140,6 +143,7 @@ TSP_RUSTFS_SEGMENT_BYTES=8388608
   - 会话 `DELETE` 时强制冲刷
 - 会话 `clear` 会触发当前分段上传
 - 上传异步执行，不阻塞 1078 接收循环
+- 每次上传受并发信号量限制；失败按指数退避重试；单次尝试有超时
 
 对象键：
 
@@ -212,6 +216,7 @@ src/lib.rs             启动时确保桶存在
 - `media_keys_are_prefixed_and_path_safe`
 - `prefix_and_segment_limits_have_safe_defaults`
 - `archive_playback_pairs_video_and_audio_keys`
+- `upload_retries_transient_s3_failures`
 - `archive_put_list_get_against_s3_mock`：真实 S3 客户端对 mock 发起 PUT/GET/ListObjectsV2
 
 未执行：

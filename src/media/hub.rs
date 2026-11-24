@@ -195,7 +195,7 @@ impl Session {
             let key = archive.media_key(sim, channel, at, sequence, "h264");
             let archive = archive.clone();
             tokio::spawn(async move {
-                if let Err(error) = archive.put(&key, video, "video/h264").await {
+                if let Err(error) = archive.put_with_retry(&key, video, "video/h264").await {
                     tracing::warn!(%error, %key, "RustFS video segment upload failed");
                 }
             });
@@ -203,7 +203,7 @@ impl Session {
         if !audio.is_empty() {
             let key = archive.media_key(sim, channel, at, sequence, "aac");
             tokio::spawn(async move {
-                if let Err(error) = archive.put(&key, audio, "audio/aac").await {
+                if let Err(error) = archive.put_with_retry(&key, audio, "audio/aac").await {
                     tracing::warn!(%error, %key, "RustFS audio segment upload failed");
                 }
             });

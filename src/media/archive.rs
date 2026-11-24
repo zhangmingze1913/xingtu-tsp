@@ -8,15 +8,19 @@
 //! the feature is disabled and the media hub keeps its existing in-memory-only
 //! behaviour.
 
-use std::sync::OnceLock;
+use std::{
+    sync::{Arc, OnceLock},
+    time::Duration,
+};
 
 use aws_sdk_s3::{
-    config::{BehaviorVersion, Credentials, Region},
+    config::{retry::RetryConfig, BehaviorVersion, Credentials, Region},
     primitives::ByteStream,
     Client,
 };
 use chrono::{DateTime, Utc};
 use serde::Serialize;
+use tokio::sync::Semaphore;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ArchiveError {
@@ -26,6 +30,8 @@ pub enum ArchiveError {
     InvalidKey(String),
     #[error("S3 request failed: {0}")]
     S3(String),
+    #[error("S3 upload timed out after {0:?}")]
+    Timeout(Duration),
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -39,6 +45,9 @@ pub struct RustFsArchive {
     client: Client,
     bucket: String,
     prefix: String,
+    upload_slots: Arc<Semaphore>,
+    retries: u32,
+    timeout: Duration,
 }
 
 impl RustFsArchive {
@@ -100,11 +109,19 @@ impl RustFsArchive {
                 "rustfs",
             ))
             .force_path_style(true)
+            .retry_config(RetryConfig::disabled())
             .build();
+        let retries = env_u32("TSP_RUSTFS_UPLOAD_RETRIES", 3, 0, 10);
+        let timeout =
+            Duration::from_secs(env_u32("TSP_RUSTFS_UPLOAD_TIMEOUT_SECS", 30, 1, 600) as u64);
+        let concurrency = env_u32("TSP_RUSTFS_UPLOAD_CONCURRENCY", 4, 1, 64) as usize;
         Ok(Self {
             client: Client::from_conf(config),
             bucket: bucket.to_string(),
             prefix: normalize_prefix(prefix),
+            upload_slots: Arc::new(Semaphore::new(concurrency)),
+            retries,
+            timeout,
         })
     }
 
@@ -143,6 +160,42 @@ impl RustFsArchive {
 
     pub fn media_prefix(&self, sim: &str, channel: u8) -> String {
         format!("{}/{}/{}/", self.prefix, safe_component(sim), channel)
+    }
+
+    /// Override retry count and per-attempt timeout (tests/operators).
+    pub fn with_upload_policy(mut self, retries: u32, timeout: Duration) -> Self {
+        self.retries = retries;
+        self.timeout = timeout;
+        self
+    }
+
+    /// Upload with bounded concurrency, timeout and exponential backoff.
+    pub async fn put_with_retry(
+        &self,
+        key: &str,
+        bytes: Vec<u8>,
+        content_type: &str,
+    ) -> Result<(), ArchiveError> {
+        let _permit = self
+            .upload_slots
+            .acquire()
+            .await
+            .map_err(|error| ArchiveError::S3(error.to_string()))?;
+        let mut last_error = None;
+        for attempt in 0..=self.retries {
+            match tokio::time::timeout(self.timeout, self.put(key, bytes.clone(), content_type))
+                .await
+            {
+                Ok(Ok(())) => return Ok(()),
+                Ok(Err(error)) => last_error = Some(error),
+                Err(_) => last_error = Some(ArchiveError::Timeout(self.timeout)),
+            }
+            if attempt < self.retries {
+                let backoff = Duration::from_millis(100 * (1u64 << attempt.min(5)));
+                tokio::time::sleep(backoff).await;
+            }
+        }
+        Err(last_error.unwrap_or_else(|| ArchiveError::S3("upload failed".to_string())))
     }
 
     /// Create the media bucket when missing. Safe to call on every startup.
@@ -267,6 +320,14 @@ pub fn segment_bytes() -> usize {
         .and_then(|value| value.parse().ok())
         .filter(|value: &usize| *value >= 64 * 1024)
         .unwrap_or(8 * 1024 * 1024)
+}
+
+fn env_u32(name: &str, default: u32, min: u32, max: u32) -> u32 {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.parse::<u32>().ok())
+        .map(|value| value.clamp(min, max))
+        .unwrap_or(default)
 }
 
 fn normalize_prefix(prefix: &str) -> String {
@@ -421,5 +482,70 @@ mod tests {
         assert_eq!(listed[0].size, 7);
         let bytes = archive.get(key).await.expect("get");
         assert_eq!(bytes, b"segment");
+    }
+
+    #[tokio::test]
+    async fn upload_retries_transient_s3_failures() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        use axum::{
+            body::Bytes,
+            extract::{Path, State},
+            http::StatusCode,
+            routing::put,
+            Router,
+        };
+
+        #[derive(Clone)]
+        struct RetryState {
+            objects: Arc<std::sync::Mutex<std::collections::HashMap<String, Vec<u8>>>>,
+            puts: Arc<AtomicUsize>,
+        }
+
+        async fn flaky_put(
+            State(state): State<RetryState>,
+            Path(key): Path<String>,
+            body: Bytes,
+        ) -> StatusCode {
+            let attempt = state.puts.fetch_add(1, Ordering::SeqCst);
+            if attempt < 2 {
+                return StatusCode::INTERNAL_SERVER_ERROR;
+            }
+            state.objects.lock().unwrap().insert(key, body.to_vec());
+            StatusCode::OK
+        }
+
+        let state = RetryState {
+            objects: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+            puts: Arc::new(AtomicUsize::new(0)),
+        };
+        let app = Router::new().route(
+            "/tsp-media/{*key}",
+            put(flaky_put).with_state(state.clone()),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+
+        let archive = RustFsArchive::from_parts(
+            &format!("http://{addr}"),
+            "tsp-media",
+            "access",
+            "secret",
+            "us-east-1",
+            "media",
+        )
+        .expect("archive")
+        .with_upload_policy(2, Duration::from_secs(2));
+        archive
+            .put_with_retry("media/1/1/test.h264", b"payload".to_vec(), "video/h264")
+            .await
+            .expect("retry succeeds");
+        assert_eq!(state.puts.load(Ordering::SeqCst), 3);
+        assert_eq!(state.objects.lock().unwrap().len(), 1);
     }
 }

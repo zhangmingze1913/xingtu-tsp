@@ -34,6 +34,9 @@ data:
   TSP_RUSTFS_REGION: "us-east-1"
   TSP_RUSTFS_PREFIX: "media"
   TSP_RUSTFS_SEGMENT_SECS: "30"
+  TSP_RUSTFS_UPLOAD_RETRIES: "3"
+  TSP_RUSTFS_UPLOAD_TIMEOUT_SECS: "30"
+  TSP_RUSTFS_UPLOAD_CONCURRENCY: "4"
   # Use a managed Redis or Redis Operator in production.
   TSP_REDIS_URL: "redis://redis:6379/0"
   # Optional Apache Iggy HTTP event log. Set the URL and apply iggy.yaml to enable.
