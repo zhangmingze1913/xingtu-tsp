@@ -166,6 +166,14 @@ impl Metrics {
             "xingtu_archive_spool_replayed_total {}\n",
             archive.spool_replayed
         ));
+        out.push_str(
+            "# HELP xingtu_archive_spool_failed_total Failed spool writes (disk full/IO).\n",
+        );
+        out.push_str("# TYPE xingtu_archive_spool_failed_total counter\n");
+        out.push_str(&format!(
+            "xingtu_archive_spool_failed_total {}\n",
+            archive.spool_failed
+        ));
         out.push_str("# HELP xingtu_archive_spool_pending Spooled uploads waiting for replay.\n");
         out.push_str("# TYPE xingtu_archive_spool_pending gauge\n");
         out.push_str(&format!(

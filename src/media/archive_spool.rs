@@ -30,17 +30,26 @@ pub struct SpoolItem {
 }
 
 pub static SPOOL_PENDING: AtomicU64 = AtomicU64::new(0);
+pub static SPOOL_BYTES: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone)]
 pub struct ArchiveSpool {
     dir: PathBuf,
+    max_bytes: u64,
 }
 
 impl ArchiveSpool {
     pub fn new(dir: impl AsRef<Path>) -> std::io::Result<Self> {
+        Self::new_with_limit(dir, spool_max_bytes())
+    }
+
+    pub fn new_with_limit(dir: impl AsRef<Path>, max_bytes: u64) -> std::io::Result<Self> {
         let dir = dir.as_ref().to_path_buf();
         std::fs::create_dir_all(&dir)?;
-        Ok(Self { dir })
+        Ok(Self {
+            dir,
+            max_bytes: max_bytes.max(1),
+        })
     }
 
     pub fn from_env() -> Option<Self> {
@@ -63,6 +72,12 @@ impl ArchiveSpool {
     }
 
     pub async fn save(&self, key: &str, bytes: Vec<u8>, content_type: &str) -> std::io::Result<()> {
+        let length = bytes.len() as u64;
+        let previous = SPOOL_BYTES.fetch_add(length, Ordering::Relaxed);
+        if previous + length > self.max_bytes {
+            SPOOL_BYTES.fetch_sub(length, Ordering::Relaxed);
+            return Err(std::io::Error::other("archive spool is full"));
+        }
         let id = spool_id(key);
         let meta = SpoolMeta {
             key: key.to_string(),
@@ -72,11 +87,19 @@ impl ArchiveSpool {
         let meta_path = self.dir.join(format!("{id}.json"));
         let bin_tmp = self.dir.join(format!("{id}.bin.tmp"));
         let meta_tmp = self.dir.join(format!("{id}.json.tmp"));
-        tokio::fs::write(&bin_tmp, bytes).await?;
-        tokio::fs::rename(&bin_tmp, &bin_path).await?;
-        let encoded = serde_json::to_vec(&meta).map_err(std::io::Error::other)?;
-        tokio::fs::write(&meta_tmp, encoded).await?;
-        tokio::fs::rename(&meta_tmp, &meta_path).await?;
+        let result = async {
+            tokio::fs::write(&bin_tmp, bytes).await?;
+            tokio::fs::rename(&bin_tmp, &bin_path).await?;
+            let encoded = serde_json::to_vec(&meta).map_err(std::io::Error::other)?;
+            tokio::fs::write(&meta_tmp, encoded).await?;
+            tokio::fs::rename(&meta_tmp, &meta_path).await?;
+            Ok::<(), std::io::Error>(())
+        }
+        .await;
+        if let Err(error) = result {
+            SPOOL_BYTES.fetch_sub(length, Ordering::Relaxed);
+            return Err(error);
+        }
         SPOOL_PENDING.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
@@ -111,16 +134,26 @@ impl ArchiveSpool {
         }
         items.sort_by(|left, right| left.id.cmp(&right.id));
         SPOOL_PENDING.store(items.len() as u64, Ordering::Relaxed);
+        SPOOL_BYTES.store(
+            items.iter().map(|item| item.bytes.len() as u64).sum(),
+            Ordering::Relaxed,
+        );
         Ok(items)
     }
 
     pub async fn remove(&self, id: &str) -> std::io::Result<()> {
+        let bin = self.dir.join(format!("{id}.bin"));
+        let length = tokio::fs::metadata(&bin)
+            .await
+            .map(|meta| meta.len())
+            .unwrap_or(0);
         let removed = tokio::fs::remove_file(self.dir.join(format!("{id}.json")))
             .await
             .is_ok();
-        let _ = tokio::fs::remove_file(self.dir.join(format!("{id}.bin"))).await;
+        let _ = tokio::fs::remove_file(&bin).await;
         if removed {
             SPOOL_PENDING.fetch_sub(1, Ordering::Relaxed);
+            SPOOL_BYTES.fetch_sub(length, Ordering::Relaxed);
         }
         Ok(())
     }
@@ -129,6 +162,14 @@ impl ArchiveSpool {
 pub fn global() -> Option<&'static ArchiveSpool> {
     static SPOOL: OnceLock<Option<ArchiveSpool>> = OnceLock::new();
     SPOOL.get_or_init(ArchiveSpool::from_env).as_ref()
+}
+
+pub fn spool_max_bytes() -> u64 {
+    std::env::var("TSP_ARCHIVE_SPOOL_MAX_BYTES")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|value| *value >= 1024 * 1024)
+        .unwrap_or(1024 * 1024 * 1024)
 }
 
 pub fn replay_interval_seconds() -> u64 {
@@ -183,5 +224,18 @@ mod tests {
         assert_eq!(id.len(), 64);
         assert!(id.chars().all(|ch| ch.is_ascii_hexdigit()));
         assert_eq!(id, spool_id("media/../../evil.h264"));
+    }
+
+    #[tokio::test]
+    async fn spool_rejects_when_limit_exceeded() {
+        let dir = temp_dir();
+        let spool = ArchiveSpool::new_with_limit(&dir, 10).expect("spool");
+        spool
+            .save("a", vec![0u8; 6], "video/h264")
+            .await
+            .expect("first");
+        assert!(spool.save("b", vec![0u8; 6], "video/h264").await.is_err());
+        assert_eq!(spool.pending().await.expect("pending").len(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

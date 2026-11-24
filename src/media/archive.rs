@@ -48,6 +48,7 @@ pub static PLAYBACK_CACHE_HIT: AtomicU64 = AtomicU64::new(0);
 pub static PLAYBACK_CACHE_MISS: AtomicU64 = AtomicU64::new(0);
 pub static UPLOAD_SPOOLED: AtomicU64 = AtomicU64::new(0);
 pub static SPOOL_REPLAYED: AtomicU64 = AtomicU64::new(0);
+pub static SPOOL_FAILED: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ArchiveStats {
@@ -63,6 +64,7 @@ pub struct ArchiveStats {
     pub upload_spooled: u64,
     pub spool_replayed: u64,
     pub spool_pending: u64,
+    pub spool_failed: u64,
 }
 
 pub fn stats() -> ArchiveStats {
@@ -79,6 +81,7 @@ pub fn stats() -> ArchiveStats {
         upload_spooled: UPLOAD_SPOOLED.load(Ordering::Relaxed),
         spool_replayed: SPOOL_REPLAYED.load(Ordering::Relaxed),
         spool_pending: crate::media::archive_spool::SPOOL_PENDING.load(Ordering::Relaxed),
+        spool_failed: SPOOL_FAILED.load(Ordering::Relaxed),
     }
 }
 
@@ -256,7 +259,10 @@ impl RustFsArchive {
                     UPLOAD_SPOOLED.fetch_add(1, Ordering::Relaxed);
                     tracing::warn!(%key, "archive upload spooled for replay");
                 }
-                Err(error) => tracing::warn!(%error, %key, "archive spool write failed"),
+                Err(error) => {
+                    SPOOL_FAILED.fetch_add(1, Ordering::Relaxed);
+                    tracing::warn!(%error, %key, "archive spool write failed");
+                }
             }
         }
         Err(last_error.unwrap_or_else(|| ArchiveError::S3("upload failed".to_string())))

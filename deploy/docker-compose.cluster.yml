@@ -58,6 +58,7 @@ services:
       TSP_ARCHIVE_PLAYBACK_CACHE_BYTES: "67108864"
       TSP_ARCHIVE_SPOOL_DIR: /tmp/archive-spool
       TSP_ARCHIVE_SPOOL_REPLAY_SECS: "60"
+      TSP_ARCHIVE_SPOOL_MAX_BYTES: "1073741824"
       RUST_LOG: xingtu_tsp=info
     depends_on:
       postgres:
