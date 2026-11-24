@@ -163,6 +163,16 @@ pub async fn timeseries_reconcile(
     })))
 }
 
+fn scoped_history_org(user: &AuthUser, requested: Option<&str>) -> AppResult<Option<String>> {
+    if user.is_admin() {
+        return Ok(requested.map(str::to_string));
+    }
+    if user.org_name.is_empty() {
+        return Err(AppError::forbidden("账号未绑定组织，无法查询对账历史"));
+    }
+    Ok(Some(user.org_name.clone()))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ReconcileHistoryQuery {
     pub limit: Option<i64>,
@@ -176,13 +186,13 @@ pub async fn timeseries_reconciliations(
     user: AuthUser,
     Query(query): Query<ReconcileHistoryQuery>,
 ) -> AppResult<Json<Value>> {
-    user.require_admin()?;
+    let org_name = scoped_history_org(&user, query.org_name.as_deref())?;
     let rows = state
         .db
         .list_timeseries_reconciliations(
             query.limit.unwrap_or(50),
             query.vehicle_id.as_deref(),
-            query.org_name.as_deref(),
+            org_name.as_deref(),
             query.consistent,
         )
         .await?;
@@ -229,13 +239,13 @@ pub async fn timeseries_reconciliations_export(
     user: AuthUser,
     Query(query): Query<ReconcileHistoryQuery>,
 ) -> AppResult<Response> {
-    user.require_admin()?;
+    let org_name = scoped_history_org(&user, query.org_name.as_deref())?;
     let rows = state
         .db
         .list_timeseries_reconciliations(
             query.limit.unwrap_or(200),
             query.vehicle_id.as_deref(),
-            query.org_name.as_deref(),
+            org_name.as_deref(),
             query.consistent,
         )
         .await?;
@@ -297,5 +307,43 @@ mod tests {
         let csv = reconciliations_csv(&[row]);
         assert!(csv.starts_with("id,vehicle_id"));
         assert!(csv.contains("id-1,veh-1,Org-1,a,b,10,8,2,false"));
+    }
+
+    #[test]
+    fn history_org_scope_forces_non_admin_org() {
+        let admin = AuthUser {
+            id: "1".to_string(),
+            username: "admin".to_string(),
+            role: "admin".to_string(),
+            org_name: "".to_string(),
+            jti: "j".to_string(),
+        };
+        assert_eq!(
+            scoped_history_org(&admin, Some("Other"))
+                .unwrap()
+                .as_deref(),
+            Some("Other")
+        );
+        let operator = AuthUser {
+            id: "2".to_string(),
+            username: "op".to_string(),
+            role: "operator".to_string(),
+            org_name: "Org-A".to_string(),
+            jti: "j".to_string(),
+        };
+        assert_eq!(
+            scoped_history_org(&operator, Some("Other"))
+                .unwrap()
+                .as_deref(),
+            Some("Org-A")
+        );
+        let unbound = AuthUser {
+            id: "3".to_string(),
+            username: "viewer".to_string(),
+            role: "viewer".to_string(),
+            org_name: "".to_string(),
+            jti: "j".to_string(),
+        };
+        assert!(scoped_history_org(&unbound, None).is_err());
     }
 }

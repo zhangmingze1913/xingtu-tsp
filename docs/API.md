@@ -540,7 +540,7 @@ GET /integrations/timeseries/reconcile?vehicle_id=<id>&from=<rfc3339>&to=<rfc333
 GET /integrations/timeseries/reconciliations?limit=50
 ```
 
-- admin only
+- admin 可查全部组织；非管理员仅限本组织
 - 返回 `items`：vehicle_id/from/to/pg_count/td_count/count_delta/consistent/checked_at
 - 定时任务只记录 mismatch；手动对账每次记录
 
