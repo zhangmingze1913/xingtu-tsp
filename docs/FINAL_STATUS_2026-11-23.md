@@ -333,5 +333,28 @@ tdengine::tests::rest_query_maps_rows_to_points
 - K8s `deploy/k8s/tdengine.yaml`
 - `scripts/tdengine-smoke.ps1`（语法校验；真实容器未运行）
 
+写入可靠性：
+
+- 有界队列 + 3 次指数退避重试
+- 重试耗尽写磁盘 spool，后台重放
+- 指标：writes/failures/retries/dropped/queue_depth/spooled/replayed/pending
+
+对账：
+
+- `GET /api/integrations/timeseries/reconcile`
+- 比较 PG/TDengine count/min/max
+- 指标：checks/mismatches
+
+健康：
+
+- `tdengine_ready` 来自 `SELECT SERVER_VERSION()`
+- `tdengine` 模式下 `/api/ready` 依赖 TDengine
+
+部署验证：
+
+- Compose profile `tdengine`
+- K8s `deploy/k8s/tdengine.yaml`
+- `scripts/tdengine-smoke.ps1`（语法校验；真实容器未运行）
+
 真实 TDengine 容器未运行；REST 适配器已用 mock 验证。
 
