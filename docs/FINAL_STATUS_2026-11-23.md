@@ -6,7 +6,7 @@
 ## 1. 验证结果
 
 ```text
-lib                    233 passed
+lib                    235 passed
 integration            32 passed
 fmt                    clean
 clippy                 clean
@@ -228,7 +228,7 @@ NotApplicable    7
 验证：
 
 ```text
-lib                    233 passed
+lib                    235 passed
 integration            32 passed
 fmt                    clean
 clippy -D warnings     clean

@@ -374,6 +374,12 @@ pub async fn archive_playback(
         .validate_key(&query.key)
         .map_err(|error| AppError::bad_request(error.to_string()))?;
     let (video_key, audio_key) = archive_pair(&query.key)?;
+    let cache = crate::media::playback_cache::global();
+    if let Some(bytes) = cache.get(&query.key) {
+        archive::PLAYBACK_CACHE_HIT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        return Ok(mp4_response(&bytes));
+    }
+    archive::PLAYBACK_CACHE_MISS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
     let video = archive.get(&video_key).await.map_err(archive_error)?;
     let audio = match audio_key {
@@ -395,13 +401,15 @@ pub async fn archive_playback(
         }
         Err(error) => {
             archive::PLAYBACK_FAILURE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            tracing::warn!(?error, key = %query.key, "archive playback remux failed");
             return Err(AppError::new(
                 StatusCode::SERVICE_UNAVAILABLE,
                 "archive_playback_failed",
-                format!("{error:?}"),
+                format!("归档回放失败: {error:?}"),
             ));
         }
     };
+    cache.put(query.key.clone(), bytes.clone());
     Ok(mp4_response(&bytes))
 }
 

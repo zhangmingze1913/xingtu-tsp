@@ -40,6 +40,8 @@ data:
   TSP_RUSTFS_UPLOAD_CONCURRENCY: "4"
   TSP_RUSTFS_RETENTION_DAYS: "0"
   TSP_RUSTFS_CLEANUP_INTERVAL_SECS: "3600"
+  TSP_ARCHIVE_PLAYBACK_CACHE_ITEMS: "8"
+  TSP_ARCHIVE_PLAYBACK_CACHE_BYTES: "67108864"
   # Use a managed Redis or Redis Operator in production.
   TSP_REDIS_URL: "redis://redis:6379/0"
   # Optional Apache Iggy HTTP event log. Set the URL and apply iggy.yaml to enable.

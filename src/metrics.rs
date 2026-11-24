@@ -150,6 +150,20 @@ impl Metrics {
             "xingtu_archive_playback_failure_total {}\n",
             archive.playback_failure
         ));
+        out.push_str(
+            "# HELP xingtu_archive_playback_cache_hit_total Archive playbacks served from cache.\n",
+        );
+        out.push_str("# TYPE xingtu_archive_playback_cache_hit_total counter\n");
+        out.push_str(&format!(
+            "xingtu_archive_playback_cache_hit_total {}\n",
+            archive.playback_cache_hit
+        ));
+        out.push_str("# HELP xingtu_archive_playback_cache_miss_total Archive playbacks that required remux.\n");
+        out.push_str("# TYPE xingtu_archive_playback_cache_miss_total counter\n");
+        out.push_str(&format!(
+            "xingtu_archive_playback_cache_miss_total {}\n",
+            archive.playback_cache_miss
+        ));
         out.push_str("# HELP xingtu_cluster_leader Whether this node owns scheduler leadership.\n");
         out.push_str("# TYPE xingtu_cluster_leader gauge\n");
         out.push_str(&format!(
@@ -196,5 +210,6 @@ mod tests {
         assert!(text.contains("xingtu_archive_upload_success_total"));
         assert!(text.contains("xingtu_archive_segments_dropped_total"));
         assert!(text.contains("xingtu_archive_playback_failure_total"));
+        assert!(text.contains("xingtu_archive_playback_cache_hit_total"));
     }
 }

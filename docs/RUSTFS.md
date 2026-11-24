@@ -129,6 +129,8 @@ TSP_RUSTFS_UPLOAD_TIMEOUT_SECS=30
 TSP_RUSTFS_UPLOAD_CONCURRENCY=4
 TSP_RUSTFS_RETENTION_DAYS=0
 TSP_RUSTFS_CLEANUP_INTERVAL_SECS=3600
+TSP_ARCHIVE_PLAYBACK_CACHE_ITEMS=8
+TSP_ARCHIVE_PLAYBACK_CACHE_BYTES=67108864
 ```
 
 `TSP_RUSTFS_ARCHIVE` 未开启时，录制和上传完全关闭，`MediaHub` 行为与之前一致。
@@ -164,6 +166,14 @@ media/{sim}/{channel}/YYYY/MM/DD/HHMMSS-{sequence}.aac
 - 启动后按 `TSP_RUSTFS_CLEANUP_INTERVAL_SECS` 周期执行
 - 没有 `LastModified` 的对象不会被删除
 - 只清理配置前缀下对象
+
+### 回放缓存
+
+- `TSP_ARCHIVE_PLAYBACK_CACHE_ITEMS` 默认 8 条
+- `TSP_ARCHIVE_PLAYBACK_CACHE_BYTES` 默认 64MB
+- LRU，按条数与总字节双重淘汰
+- 单条超过字节上限时跳过缓存
+- FFmpeg remux 失败返回 503 并记录 warn 日志
 
 ### 归档 API
 
@@ -227,6 +237,8 @@ xingtu_archive_segments_dropped_total
 xingtu_archive_cleanup_deleted_total
 xingtu_archive_playback_success_total
 xingtu_archive_playback_failure_total
+xingtu_archive_playback_cache_hit_total
+xingtu_archive_playback_cache_miss_total
 ```
 
 ### 代码位置
@@ -246,6 +258,8 @@ src/lib.rs             启动时确保桶存在
 - `upload_retries_transient_s3_failures`
 - `cleanup_deletes_only_expired_objects`
 - `video_segments_start_at_keyframes`
+- `cache_is_lru_by_item_count`
+- `cache_evicts_by_bytes_and_skips_oversize`
 - `render_includes_archive_counters`
 - `archive_put_list_get_against_s3_mock`：真实 S3 客户端对 mock 发起 PUT/GET/ListObjectsV2
 

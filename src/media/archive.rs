@@ -44,6 +44,8 @@ pub static SEGMENTS_DROPPED: AtomicU64 = AtomicU64::new(0);
 pub static CLEANUP_DELETED: AtomicU64 = AtomicU64::new(0);
 pub static PLAYBACK_SUCCESS: AtomicU64 = AtomicU64::new(0);
 pub static PLAYBACK_FAILURE: AtomicU64 = AtomicU64::new(0);
+pub static PLAYBACK_CACHE_HIT: AtomicU64 = AtomicU64::new(0);
+pub static PLAYBACK_CACHE_MISS: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ArchiveStats {
@@ -54,6 +56,8 @@ pub struct ArchiveStats {
     pub cleanup_deleted: u64,
     pub playback_success: u64,
     pub playback_failure: u64,
+    pub playback_cache_hit: u64,
+    pub playback_cache_miss: u64,
 }
 
 pub fn stats() -> ArchiveStats {
@@ -65,6 +69,8 @@ pub fn stats() -> ArchiveStats {
         cleanup_deleted: CLEANUP_DELETED.load(Ordering::Relaxed),
         playback_success: PLAYBACK_SUCCESS.load(Ordering::Relaxed),
         playback_failure: PLAYBACK_FAILURE.load(Ordering::Relaxed),
+        playback_cache_hit: PLAYBACK_CACHE_HIT.load(Ordering::Relaxed),
+        playback_cache_miss: PLAYBACK_CACHE_MISS.load(Ordering::Relaxed),
     }
 }
 
