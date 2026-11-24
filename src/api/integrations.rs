@@ -194,6 +194,7 @@ pub struct ReconcileHistoryQuery {
     pub org_name: Option<String>,
     pub consistent: Option<bool>,
     pub cursor: Option<String>,
+    pub footer: Option<bool>,
 }
 
 pub async fn timeseries_reconciliations(
@@ -261,6 +262,8 @@ pub async fn timeseries_reconciliations_export(
 ) -> AppResult<Response> {
     let org_name = scoped_history_org(&user, query.org_name.as_deref())?;
     let max_rows = query.limit.unwrap_or(2000).clamp(1, 5000) as usize;
+    let footer = query.footer.unwrap_or(false);
+    let exported = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let page_size = 500i64;
     let db = state.db.clone();
     let vehicle = query.vehicle_id.clone();
@@ -320,7 +323,17 @@ pub async fn timeseries_reconciliations_export(
             "id,vehicle_id,org_name,from_ts,to_ts,pg_count,td_count,count_delta,consistent,checked_at\n",
         ))
     });
-    let stream = futures_util::StreamExt::chain(header, rows);
+    let footer = futures_util::stream::once(async move {
+        if footer {
+            Ok::<Bytes, std::io::Error>(Bytes::from(csv_footer(
+                exported.load(std::sync::atomic::Ordering::Relaxed),
+            )))
+        } else {
+            Ok(Bytes::new())
+        }
+    });
+    let stream =
+        futures_util::StreamExt::chain(futures_util::StreamExt::chain(header, rows), footer);
     Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "text/csv; charset=utf-8")
@@ -380,6 +393,10 @@ pub async fn timeseries_reconciliations_export_page(
         );
     }
     Ok(response)
+}
+
+fn csv_footer(rows: usize) -> String {
+    format!("#END,{rows}\n")
 }
 
 fn csv_field(value: &str) -> String {
@@ -492,5 +509,10 @@ mod tests {
         assert!(parse_history_cursor(Some("missing")).is_err());
         assert!(parse_history_cursor(Some("|abc")).is_err());
         assert!(parse_history_cursor(Some("ts|")).is_err());
+    }
+
+    #[test]
+    fn csv_footer_reports_row_count() {
+        assert_eq!(csv_footer(42), "#END,42\n");
     }
 }
