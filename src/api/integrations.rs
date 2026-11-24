@@ -659,6 +659,7 @@ async fn run_reconciliation_export_inner(
             return Ok(());
         }
     }
+    let _ = tokio::fs::remove_file(&final_path).await;
     tokio::fs::rename(&tmp_path, &final_path)
         .await
         .map_err(|error| AppError::internal(format!("export rename: {error}")))?;
@@ -746,4 +747,44 @@ pub async fn cancel_reconciliation_export_job(
         ));
     }
     Ok(Json(json!({"id": id, "status": "cancelled"})))
+}
+
+pub async fn retry_reconciliation_export_job(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<String>,
+) -> AppResult<Json<Value>> {
+    let job = state
+        .db
+        .get_reconciliation_export_job(&id)
+        .await?
+        .ok_or_else(|| AppError::not_found("导出任务不存在"))?;
+    if !user.is_admin() && job.org_name != user.org_name {
+        return Err(AppError::forbidden("无权重试该导出任务"));
+    }
+    if !state.db.reset_reconciliation_export_job(&id).await? {
+        return Err(AppError::new(
+            StatusCode::CONFLICT,
+            "export_not_retryable",
+            "仅 failed/cancelled 任务可重试",
+        ));
+    }
+    crate::tdengine::EXPORT_JOBS_RETRIED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    crate::tdengine::EXPORT_JOBS_STARTED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let worker_state = state.clone();
+    let worker_id = id.clone();
+    tokio::spawn(async move {
+        run_reconciliation_export(
+            worker_state,
+            worker_id,
+            Some(job.org_name),
+            job.vehicle_id,
+            job.consistent,
+            job.max_rows,
+        )
+        .await;
+    });
+    Ok(Json(
+        json!({"id": id, "status": "running", "retried": true}),
+    ))
 }

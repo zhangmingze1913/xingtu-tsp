@@ -1,0 +1,15 @@
+# Optional persistent directory for reconciliation export jobs.
+#
+# ReadWriteMany is required when more than one API replica may run an export
+# worker. For ReadWriteOnce storage, pin export work to a single replica or use
+# a StatefulSet with per-pod claims.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: reconcile-export
+  namespace: xingtu-tsp
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources:
+    requests:
+      storage: 20Gi

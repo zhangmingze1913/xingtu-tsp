@@ -165,6 +165,21 @@ impl Db {
         Ok(())
     }
 
+    pub async fn reset_reconciliation_export_job(&self, id: &str) -> AppResult<bool> {
+        let result = self
+            .query(
+                "UPDATE reconciliation_export_jobs
+                 SET status = 'running', rows_written = 0, file_path = NULL,
+                     error = NULL, updated_at = ?1
+                 WHERE id = ?2 AND status IN ('failed', 'cancelled')",
+            )
+            .bind(crate::util::now_iso())
+            .bind(id)
+            .execute(self.pool())
+            .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
     pub async fn cancel_reconciliation_export_job(&self, id: &str) -> AppResult<bool> {
         let result = self
             .query(
@@ -413,5 +428,32 @@ mod tests {
             .expect("get")
             .expect("job");
         assert_eq!(job.status, "cancelled");
+    }
+
+    #[tokio::test]
+    async fn export_job_retry_only_terminal() {
+        let db = Db::in_memory().await.expect("db");
+        let id = db
+            .create_reconciliation_export_job("Org", None, None, 10)
+            .await
+            .expect("create");
+        assert!(!db
+            .reset_reconciliation_export_job(&id)
+            .await
+            .expect("running"));
+        db.update_reconciliation_export_job(&id, "failed", 0, None, Some("boom"))
+            .await
+            .expect("fail");
+        assert!(db
+            .reset_reconciliation_export_job(&id)
+            .await
+            .expect("reset"));
+        let job = db
+            .get_reconciliation_export_job(&id)
+            .await
+            .expect("get")
+            .expect("job");
+        assert_eq!(job.status, "running");
+        assert!(job.error.is_none());
     }
 }

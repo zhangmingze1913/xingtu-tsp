@@ -176,6 +176,22 @@ kubectl -n xingtu-tsp patch deployment tsp-jt808 --type=strategic -p '
 
 Compose 集群已使用命名卷 `tdengine-spool`，可直接持久化。
 
+导出目录持久化：
+
+```bash
+kubectl -n xingtu-tsp apply -f deploy/k8s/reconcile-export-pvc.yaml
+```
+
+```bash
+kubectl -n xingtu-tsp patch deployment tsp-api --type=strategic -p '
+{"spec":{"template":{"spec":{
+  "volumes":[{"name":"reconcile-export","persistentVolumeClaim":{"claimName":"reconcile-export"}}],
+  "containers":[{"name":"api","volumeMounts":[{"name":"reconcile-export","mountPath":"/tmp/reconcile-exports"}]}]
+}}}}'
+```
+
+同样要求 `ReadWriteMany`；否则固定单副本执行导出。
+
 ## 6. 数据模型
 
 应用启动时自动执行：
@@ -386,6 +402,7 @@ POST /api/integrations/timeseries/reconciliations/export/jobs
 GET  /api/integrations/timeseries/reconciliations/export/jobs/{id}
 GET  /api/integrations/timeseries/reconciliations/export/jobs/{id}/download
 POST /api/integrations/timeseries/reconciliations/export/jobs/{id}/cancel
+POST /api/integrations/timeseries/reconciliations/export/jobs/{id}/retry
 ```
 
 POST body：
@@ -399,6 +416,8 @@ POST body：
 - 文件目录：`TSP_RECONCILE_EXPORT_DIR`
 - 非管理员只能访问本组织任务
 - worker 每页检查 `cancelled` 状态，取消后删除临时文件
+- `failed` / `cancelled` 任务可重试，重置进度并重新执行
+- 重试前会覆盖旧 CSV，避免文件冲突
 - 指标：`xingtu_reconcile_export_jobs_{started,completed,failed,cancelled}_total`
 - 进程重启时 `running` 任务不会自动恢复，需要重新提交
 - 已完成/失败任务默认保留 24 小时，每小时清理记录与文件

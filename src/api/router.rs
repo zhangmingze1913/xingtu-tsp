@@ -122,6 +122,10 @@ pub fn build_router(state: AppState) -> Router {
             axum::routing::post(integrations::cancel_reconciliation_export_job),
         )
         .route(
+            "/integrations/timeseries/reconciliations/export/jobs/{id}/retry",
+            axum::routing::post(integrations::retry_reconciliation_export_job),
+        )
+        .route(
             "/integrations/timeseries/spool",
             get(integrations::timeseries_spool),
         )

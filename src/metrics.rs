@@ -195,6 +195,12 @@ impl Metrics {
             archive.playback_cache_miss
         ));
         let tdengine = crate::tdengine::stats();
+        out.push_str("# HELP xingtu_reconcile_export_jobs_retried_total Reconciliation export jobs retried.\n");
+        out.push_str("# TYPE xingtu_reconcile_export_jobs_retried_total counter\n");
+        out.push_str(&format!(
+            "xingtu_reconcile_export_jobs_retried_total {}\n",
+            tdengine.export_jobs_retried
+        ));
         out.push_str("# HELP xingtu_reconcile_export_jobs_started_total Reconciliation export jobs started.\n");
         out.push_str("# TYPE xingtu_reconcile_export_jobs_started_total counter\n");
         out.push_str(&format!(
