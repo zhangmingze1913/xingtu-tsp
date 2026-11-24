@@ -563,6 +563,6 @@ GET /integrations/timeseries/reconciliations/export?vehicle_id=...&org_name=...&
 ```
 
 - admin only
-- 最多 5000 行，流式输出
+- 最多 5000 行，500 行/页 keyset 流式输出
 - CSV 列：id/vehicle_id/org_name/from_ts/to_ts/pg_count/td_count/count_delta/consistent/checked_at
 

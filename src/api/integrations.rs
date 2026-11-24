@@ -250,21 +250,67 @@ pub async fn timeseries_reconciliations_export(
     Query(query): Query<ReconcileHistoryQuery>,
 ) -> AppResult<Response> {
     let org_name = scoped_history_org(&user, query.org_name.as_deref())?;
-    let rows = state
-        .db
-        .list_timeseries_reconciliations(
-            query.limit.unwrap_or(2000).clamp(1, 5000),
-            query.vehicle_id.as_deref(),
-            org_name.as_deref(),
-            query.consistent,
-        )
-        .await?;
-    let lines = reconciliations_csv_lines(&rows);
-    let stream = futures_util::stream::iter(
-        lines
-            .into_iter()
-            .map(|line| Ok::<Bytes, std::io::Error>(Bytes::from(line))),
+    let max_rows = query.limit.unwrap_or(2000).clamp(1, 5000) as usize;
+    let page_size = 500i64;
+    let db = state.db.clone();
+    let vehicle = query.vehicle_id.clone();
+    let consistent = query.consistent;
+    let state = (
+        db,
+        vehicle,
+        org_name,
+        consistent,
+        None::<(String, String)>,
+        0usize,
     );
+    let rows = futures_util::stream::unfold(
+        state,
+        move |(db, vehicle, org, consistent, cursor, sent)| async move {
+            if sent >= max_rows {
+                return None;
+            }
+            let remaining = (max_rows - sent).min(page_size as usize) as i64;
+            let before = cursor.as_ref().map(|(ts, id)| (ts.as_str(), id.as_str()));
+            match db
+                .list_timeseries_reconciliations_page(
+                    remaining,
+                    before,
+                    vehicle.as_deref(),
+                    org.as_deref(),
+                    consistent,
+                )
+                .await
+            {
+                Ok(rows) if rows.is_empty() => None,
+                Ok(rows) => {
+                    let mut chunk = String::new();
+                    for row in &rows {
+                        chunk.push_str(&csv_row(row));
+                    }
+                    let last = rows.last().expect("non-empty");
+                    let next = Some((last.checked_at.clone(), last.id.clone()));
+                    let sent = sent + rows.len();
+                    Some((
+                        Ok::<Bytes, std::io::Error>(Bytes::from(chunk)),
+                        (db, vehicle, org, consistent, next, sent),
+                    ))
+                }
+                Err(error) => {
+                    tracing::warn!(%error, "reconciliation CSV page failed");
+                    Some((
+                        Err(std::io::Error::other(error.to_string())),
+                        (db, vehicle, org, consistent, None, max_rows),
+                    ))
+                }
+            }
+        },
+    );
+    let header = futures_util::stream::once(async {
+        Ok::<Bytes, std::io::Error>(Bytes::from(
+            "id,vehicle_id,org_name,from_ts,to_ts,pg_count,td_count,count_delta,consistent,checked_at\n",
+        ))
+    });
+    let stream = futures_util::StreamExt::chain(header, rows);
     Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "text/csv; charset=utf-8")
@@ -284,6 +330,7 @@ fn csv_field(value: &str) -> String {
     }
 }
 
+#[cfg(test)]
 fn reconciliations_csv_lines(rows: &[crate::models::TimeseriesReconciliation]) -> Vec<String> {
     let mut lines = Vec::with_capacity(rows.len() + 1);
     lines.push(
@@ -291,21 +338,25 @@ fn reconciliations_csv_lines(rows: &[crate::models::TimeseriesReconciliation]) -
             .to_string(),
     );
     for row in rows {
-        lines.push(format!(
-            "{},{},{},{},{},{},{},{},{},{}\n",
-            csv_field(&row.id),
-            csv_field(&row.vehicle_id),
-            csv_field(&row.org_name),
-            csv_field(&row.from_ts),
-            csv_field(&row.to_ts),
-            row.pg_count,
-            row.td_count,
-            row.count_delta,
-            row.consistent,
-            csv_field(&row.checked_at)
-        ));
+        lines.push(csv_row(row));
     }
     lines
+}
+
+fn csv_row(row: &crate::models::TimeseriesReconciliation) -> String {
+    format!(
+        "{},{},{},{},{},{},{},{},{},{}\n",
+        csv_field(&row.id),
+        csv_field(&row.vehicle_id),
+        csv_field(&row.org_name),
+        csv_field(&row.from_ts),
+        csv_field(&row.to_ts),
+        row.pg_count,
+        row.td_count,
+        row.count_delta,
+        row.consistent,
+        csv_field(&row.checked_at)
+    )
 }
 
 #[cfg(test)]

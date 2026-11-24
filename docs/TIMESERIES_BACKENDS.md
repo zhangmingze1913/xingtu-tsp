@@ -263,7 +263,8 @@ GET /api/integrations/timeseries/reconciliations/export?vehicle_id=...&org_name=
 ```
 
 - 复用 `limit`（最大 5000，默认 2000）、`vehicle_id`、`org_name`、`consistent` 过滤
-- 行数据以流式响应输出，CSV 字段做引号转义
+- 行数据按 500 行/页 keyset 查询并流式输出，避免全量加载
+- CSV 字段做引号转义
 - CSV 含 `org_name` 列
 - `Content-Type: text/csv`
 - 定时任务只持久化 mismatch，手动接口每次持久化
