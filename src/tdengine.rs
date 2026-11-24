@@ -28,6 +28,8 @@ pub static FAILURES: AtomicU64 = AtomicU64::new(0);
 pub static RETRIES: AtomicU64 = AtomicU64::new(0);
 pub static DROPPED: AtomicU64 = AtomicU64::new(0);
 pub static QUEUE_DEPTH: AtomicI64 = AtomicI64::new(0);
+pub static RECONCILE_CHECKS: AtomicU64 = AtomicU64::new(0);
+pub static RECONCILE_MISMATCHES: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TdengineStats {
@@ -36,6 +38,8 @@ pub struct TdengineStats {
     pub retries: u64,
     pub dropped: u64,
     pub queue_depth: i64,
+    pub reconcile_checks: u64,
+    pub reconcile_mismatches: u64,
 }
 
 pub fn stats() -> TdengineStats {
@@ -45,6 +49,8 @@ pub fn stats() -> TdengineStats {
         retries: RETRIES.load(Ordering::Relaxed),
         dropped: DROPPED.load(Ordering::Relaxed),
         queue_depth: QUEUE_DEPTH.load(Ordering::Relaxed),
+        reconcile_checks: RECONCILE_CHECKS.load(Ordering::Relaxed),
+        reconcile_mismatches: RECONCILE_MISMATCHES.load(Ordering::Relaxed),
     }
 }
 
@@ -239,6 +245,55 @@ impl TdengineStore {
         Ok(points)
     }
 
+    pub async fn range_stats(
+        &self,
+        vehicle_id: &str,
+        from: &str,
+        to: &str,
+    ) -> AppResult<crate::models::TelemetryRangeStats> {
+        let start = DateTime::parse_from_rfc3339(from)
+            .map_err(|_| AppError::bad_request("from 必须是 RFC3339 时间"))?
+            .timestamp_millis();
+        let end = DateTime::parse_from_rfc3339(to)
+            .map_err(|_| AppError::bad_request("to 必须是 RFC3339 时间"))?
+            .timestamp_millis();
+        let id = escape_sql(vehicle_id);
+        let sql = format!(
+            "SELECT COUNT(*), MIN(ts), MAX(ts) FROM `{db}`.`telemetry` \
+             WHERE vehicle_id = '{id}' AND ts >= {start} AND ts <= {end}",
+            db = self.database,
+            id = id,
+            start = start,
+            end = end
+        );
+        let value = self.exec(&sql).await?;
+        let Some(row) = value
+            .get("data")
+            .and_then(Value::as_array)
+            .and_then(|rows| rows.first())
+            .and_then(Value::as_array)
+        else {
+            return Ok(crate::models::TelemetryRangeStats {
+                count: 0,
+                min_ts: None,
+                max_ts: None,
+            });
+        };
+        let count = row
+            .first()
+            .and_then(|value| {
+                value
+                    .as_i64()
+                    .or_else(|| value.as_str().and_then(|text| text.parse().ok()))
+            })
+            .unwrap_or(0);
+        Ok(crate::models::TelemetryRangeStats {
+            count,
+            min_ts: row.get(1).and_then(timestamp_text),
+            max_ts: row.get(2).and_then(timestamp_text),
+        })
+    }
+
     async fn write_with_retry(&self, sample: &Sample) -> bool {
         let retries = std::env::var("TSP_TDENGINE_WRITE_RETRIES")
             .ok()
@@ -352,6 +407,15 @@ impl TdengineStore {
         }
         Ok(value)
     }
+}
+
+fn timestamp_text(value: &Value) -> Option<String> {
+    if let Some(text) = value.as_str() {
+        return Some(text.to_string());
+    }
+    let ms = value.as_i64()?;
+    DateTime::<Utc>::from_timestamp_millis(ms)
+        .map(|ts| ts.to_rfc3339_opts(chrono::SecondsFormat::Secs, true))
 }
 
 fn parse_timestamp(value: &Value) -> Option<i64> {
@@ -523,5 +587,45 @@ mod tests {
         assert_eq!(inserts.load(AtomicOrdering::SeqCst), 3);
         assert_eq!(after.writes, before.writes + 1);
         assert!(after.retries >= before.retries + 2);
+    }
+
+    #[tokio::test]
+    async fn range_stats_maps_count_and_bounds() {
+        use axum::{routing::post, Router};
+
+        async fn sql(body: String) -> axum::Json<serde_json::Value> {
+            if body.contains("COUNT(*)") {
+                axum::Json(serde_json::json!({
+                    "code": 0,
+                    "data": [[5, 1_700_000_000_000i64, 1_700_003_600_000i64]]
+                }))
+            } else {
+                axum::Json(serde_json::json!({"code": 0}))
+            }
+        }
+
+        let app = Router::new().route("/rest/sql", post(sql));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        let store = TdengineStore::start(
+            format!("http://{addr}"),
+            "root".to_string(),
+            "taosdata".to_string(),
+            "tsp".to_string(),
+        )
+        .await
+        .expect("store");
+        let stats = store
+            .range_stats("veh-1", "2026-11-24T00:00:00Z", "2026-11-25T00:00:00Z")
+            .await
+            .expect("stats");
+        assert_eq!(stats.count, 5);
+        assert_eq!(stats.min_ts.as_deref(), Some("2023-11-14T22:13:20Z"));
+        assert_eq!(stats.max_ts.as_deref(), Some("2023-11-14T23:13:20Z"));
     }
 }

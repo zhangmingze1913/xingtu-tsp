@@ -221,6 +221,22 @@ impl Metrics {
             "xingtu_tdengine_spool_failed_total {}\n",
             crate::tdengine_spool::SPOOL_FAILED.load(std::sync::atomic::Ordering::Relaxed)
         ));
+        out.push_str(
+            "# HELP xingtu_tdengine_reconcile_checks_total TDengine/PG reconciliation checks.\n",
+        );
+        out.push_str("# TYPE xingtu_tdengine_reconcile_checks_total counter\n");
+        out.push_str(&format!(
+            "xingtu_tdengine_reconcile_checks_total {}\n",
+            tdengine.reconcile_checks
+        ));
+        out.push_str(
+            "# HELP xingtu_tdengine_reconcile_mismatches_total Reconciliation count mismatches.\n",
+        );
+        out.push_str("# TYPE xingtu_tdengine_reconcile_mismatches_total counter\n");
+        out.push_str(&format!(
+            "xingtu_tdengine_reconcile_mismatches_total {}\n",
+            tdengine.reconcile_mismatches
+        ));
         out.push_str("# HELP xingtu_tdengine_writes_total TDengine samples written.\n");
         out.push_str("# TYPE xingtu_tdengine_writes_total counter\n");
         out.push_str(&format!(
@@ -306,5 +322,6 @@ mod tests {
         assert!(text.contains("xingtu_tdengine_writes_total"));
         assert!(text.contains("xingtu_tdengine_queue_depth"));
         assert!(text.contains("xingtu_tdengine_spool_pending"));
+        assert!(text.contains("xingtu_tdengine_reconcile_checks_total"));
     }
 }

@@ -13,6 +13,30 @@ use crate::{
 use super::{get_i64, map_telemetry, Db, TELEMETRY_COLS};
 
 impl Db {
+    pub async fn telemetry_range_stats(
+        &self,
+        vehicle_id: &str,
+        from: &str,
+        to: &str,
+    ) -> AppResult<crate::models::TelemetryRangeStats> {
+        let sql = self.sql(
+            "SELECT COUNT(*), MIN(ts), MAX(ts) FROM telemetry \
+             WHERE vehicle_id = ?1 AND ts >= ?2 AND ts <= ?3",
+        );
+        let row = self
+            .query(&sql)
+            .bind(vehicle_id)
+            .bind(from)
+            .bind(to)
+            .fetch_one(self.pool())
+            .await?;
+        Ok(crate::models::TelemetryRangeStats {
+            count: row.get::<i64, _>(0),
+            min_ts: row.get::<Option<String>, _>(1),
+            max_ts: row.get::<Option<String>, _>(2),
+        })
+    }
+
     pub async fn telemetry_exists(&self, vehicle_id: &str, ts: &str) -> AppResult<bool> {
         let sql = self.sql("SELECT COUNT(*) FROM telemetry WHERE vehicle_id = ?1 AND ts = ?2");
         let row = self

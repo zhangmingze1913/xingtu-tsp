@@ -118,6 +118,13 @@ pub struct TelemetryPoint {
     pub source: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct TelemetryRangeStats {
+    pub count: i64,
+    pub min_ts: Option<String>,
+    pub max_ts: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Trip {
     pub id: String,

@@ -523,3 +523,14 @@ GET /media/archive/{key}
 - 下载返回 raw 对象，`Content-Type` 为 `video/h264` 或 `audio/aac`
 - `key` 必须带 `TSP_RUSTFS_PREFIX`，拒绝 `..` 与反斜杠
 
+## 时序对账（TDengine）
+
+```http
+GET /integrations/timeseries/reconcile?vehicle_id=<id>&from=<rfc3339>&to=<rfc3339>
+```
+
+- admin only
+- 比较 PostgreSQL 与 TDengine 的 count/min/max
+- `count_delta != 0` 时 `consistent=false`
+- 这是计数级对账，不替代逐点校验
+

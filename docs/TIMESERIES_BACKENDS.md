@@ -176,7 +176,33 @@ xingtu_tdengine_spool_pending
 xingtu_tdengine_spool_failed_total
 ```
 
-## 8. 一致性与限制
+## 8. 双写对账
+
+管理员接口：
+
+```http
+GET /api/integrations/timeseries/reconcile?vehicle_id=<id>&from=<rfc3339>&to=<rfc3339>
+Authorization: Bearer <admin-token>
+```
+
+返回：
+
+```json
+{
+  "postgres": {"count": 120, "min_ts": "...", "max_ts": "..."},
+  "tdengine": {"count": 118, "min_ts": "...", "max_ts": "..."},
+  "count_delta": 2,
+  "consistent": false
+}
+```
+
+- 默认时间窗口：最近 60 分钟
+- `from/to` 必须是 RFC3339
+- 仅 admin 可调用
+- 这是计数/边界对账，不是逐点哈希
+- 指标：`xingtu_tdengine_reconcile_checks_total`、`xingtu_tdengine_reconcile_mismatches_total`
+
+## 9. 一致性与限制
 
 当前实现：
 
@@ -200,7 +226,7 @@ TDengine = 可重建的查询加速副本
 - TDengine 写入延迟与失败指标
 - 保留策略与磁盘容量规划
 
-## 9. 测试
+## 10. 测试
 
 代码侧测试：
 
@@ -208,6 +234,7 @@ TDengine = 可重建的查询加速副本
 tdengine::tests::parses_timestamps_and_identifiers
 tdengine::tests::rest_query_maps_rows_to_points
 tdengine::tests::write_retries_transient_failures
+tdengine::tests::range_stats_maps_count_and_bounds
 tdengine_spool::tests::spool_save_pending_remove_roundtrip
 tdengine_spool::tests::spool_enforces_max_files
 config::tests::parses_time_series_backends

@@ -1,7 +1,16 @@
-use axum::{extract::State, Json};
+use axum::{
+    extract::{Query, State},
+    http::StatusCode,
+    Json,
+};
+use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::{auth::AuthUser, error::AppResult, state::AppState};
+use crate::{
+    auth::AuthUser,
+    error::{AppError, AppResult},
+    state::AppState,
+};
 
 /// Advertises the honest level of standards support implemented by this build.
 /// Consumers must not treat `frame=true` as conformance.
@@ -74,5 +83,52 @@ pub async fn standards(State(_state): State<AppState>, _user: AuthUser) -> AppRe
             "full_message_catalog": false,
             "conformance_tested": false
         }
+    })))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ReconcileQuery {
+    pub vehicle_id: String,
+    pub from: Option<String>,
+    pub to: Option<String>,
+}
+
+/// Compare PostgreSQL and TDengine counts over the same vehicle/time range.
+pub async fn timeseries_reconcile(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<ReconcileQuery>,
+) -> AppResult<Json<Value>> {
+    user.require_admin()?;
+    let tdengine = state.tdengine.as_ref().ok_or_else(|| {
+        AppError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "tdengine_unavailable",
+            "TDengine is not enabled",
+        )
+    })?;
+    let from = query
+        .from
+        .unwrap_or_else(|| crate::util::iso_from_now_minutes(-60));
+    let to = query.to.unwrap_or_else(crate::util::now_iso);
+    let pg = state
+        .db
+        .telemetry_range_stats(&query.vehicle_id, &from, &to)
+        .await?;
+    let td = tdengine.range_stats(&query.vehicle_id, &from, &to).await?;
+    let delta = pg.count - td.count;
+    crate::tdengine::RECONCILE_CHECKS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    if delta != 0 {
+        crate::tdengine::RECONCILE_MISMATCHES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+    Ok(Json(json!({
+        "vehicle_id": query.vehicle_id,
+        "from": from,
+        "to": to,
+        "postgres": pg,
+        "tdengine": td,
+        "count_delta": delta,
+        "consistent": delta == 0,
+        "note": "count-based comparison; PG remains authoritative",
     })))
 }

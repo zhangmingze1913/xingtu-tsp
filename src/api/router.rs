@@ -89,6 +89,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/media/archive/{*key}", get(media::archive_get))
         .route("/audit/export", get(audit::export))
         .route("/integrations/standards", get(integrations::standards))
+        .route(
+            "/integrations/timeseries/reconcile",
+            get(integrations::timeseries_reconcile),
+        )
         .route("/terminals", get(terminals::list))
         .route("/terminals/export", get(terminals::export))
         .route("/terminals/{id}", get(terminals::get))
