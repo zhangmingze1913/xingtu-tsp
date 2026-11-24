@@ -1,6 +1,6 @@
 use axum::{
     body::{Body, Bytes},
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::{header, StatusCode},
     response::Response,
     Json,
@@ -516,4 +516,194 @@ mod tests {
     fn csv_footer_reports_row_count() {
         assert_eq!(csv_footer(42), "#END,42\n");
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ExportJobRequest {
+    pub vehicle_id: Option<String>,
+    pub org_name: Option<String>,
+    pub consistent: Option<bool>,
+    pub max_rows: Option<i64>,
+}
+
+pub async fn start_reconciliation_export_job(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(request): Json<ExportJobRequest>,
+) -> AppResult<Json<Value>> {
+    let org_name = scoped_history_org(&user, request.org_name.as_deref())?;
+    let max_rows = request.max_rows.unwrap_or(5000).clamp(1, 5000);
+    let id = state
+        .db
+        .create_reconciliation_export_job(
+            org_name.as_deref().unwrap_or(""),
+            request.vehicle_id.as_deref(),
+            request.consistent,
+            max_rows,
+        )
+        .await?;
+    let worker_state = state.clone();
+    let worker_id = id.clone();
+    let worker_org = org_name.clone();
+    let worker_vehicle = request.vehicle_id.clone();
+    let worker_consistent = request.consistent;
+    tokio::spawn(async move {
+        run_reconciliation_export(
+            worker_state,
+            worker_id,
+            worker_org,
+            worker_vehicle,
+            worker_consistent,
+            max_rows,
+        )
+        .await;
+    });
+    Ok(Json(json!({"id": id, "status": "running"})))
+}
+
+async fn run_reconciliation_export(
+    state: AppState,
+    id: String,
+    org_name: Option<String>,
+    vehicle_id: Option<String>,
+    consistent: Option<bool>,
+    max_rows: i64,
+) {
+    if let Err(error) =
+        run_reconciliation_export_inner(&state, &id, org_name, vehicle_id, consistent, max_rows)
+            .await
+    {
+        tracing::warn!(%error, job = %id, "reconciliation export failed");
+        let _ = state
+            .db
+            .update_reconciliation_export_job(&id, "failed", 0, None, Some(&error.to_string()))
+            .await;
+    }
+}
+
+async fn run_reconciliation_export_inner(
+    state: &AppState,
+    id: &str,
+    org_name: Option<String>,
+    vehicle_id: Option<String>,
+    consistent: Option<bool>,
+    max_rows: i64,
+) -> AppResult<()> {
+    let dir = std::env::var("TSP_RECONCILE_EXPORT_DIR")
+        .unwrap_or_else(|_| "data/reconcile-exports".to_string());
+    tokio::fs::create_dir_all(&dir)
+        .await
+        .map_err(|error| AppError::internal(format!("export dir: {error}")))?;
+    let final_path = format!("{dir}/{id}.csv");
+    let tmp_path = format!("{final_path}.tmp");
+    tokio::fs::write(
+        &tmp_path,
+        "id,vehicle_id,org_name,from_ts,to_ts,pg_count,td_count,count_delta,consistent,checked_at\n",
+    )
+    .await
+    .map_err(|error| AppError::internal(format!("export header: {error}")))?;
+    let mut cursor: Option<(String, String)> = None;
+    let mut written = 0i64;
+    loop {
+        let remaining = (max_rows - written).clamp(1, 500);
+        let page = state
+            .db
+            .list_timeseries_reconciliations_page(
+                remaining,
+                cursor
+                    .as_ref()
+                    .map(|(ts, row_id)| (ts.as_str(), row_id.as_str())),
+                vehicle_id.as_deref(),
+                org_name.as_deref(),
+                consistent,
+            )
+            .await?;
+        if page.is_empty() {
+            break;
+        }
+        let mut chunk = String::new();
+        for row in &page {
+            chunk.push_str(&csv_row(row));
+        }
+        use tokio::io::AsyncWriteExt;
+        let mut file = tokio::fs::OpenOptions::new()
+            .append(true)
+            .open(&tmp_path)
+            .await
+            .map_err(|error| AppError::internal(format!("export open: {error}")))?;
+        file.write_all(chunk.as_bytes())
+            .await
+            .map_err(|error| AppError::internal(format!("export write: {error}")))?;
+        written += page.len() as i64;
+        let last = page.last().expect("non-empty");
+        cursor = Some((last.checked_at.clone(), last.id.clone()));
+        state
+            .db
+            .update_reconciliation_export_job(id, "running", written, None, None)
+            .await?;
+        if page.len() < remaining as usize || written >= max_rows {
+            break;
+        }
+    }
+    tokio::fs::rename(&tmp_path, &final_path)
+        .await
+        .map_err(|error| AppError::internal(format!("export rename: {error}")))?;
+    state
+        .db
+        .update_reconciliation_export_job(id, "completed", written, Some(&final_path), None)
+        .await?;
+    Ok(())
+}
+
+pub async fn reconciliation_export_job(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<String>,
+) -> AppResult<Json<Value>> {
+    let job = state
+        .db
+        .get_reconciliation_export_job(&id)
+        .await?
+        .ok_or_else(|| AppError::not_found("导出任务不存在"))?;
+    if !user.is_admin() && job.org_name != user.org_name {
+        return Err(AppError::forbidden("无权访问该导出任务"));
+    }
+    Ok(Json(json!(job)))
+}
+
+pub async fn download_reconciliation_export_job(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<String>,
+) -> AppResult<Response> {
+    let job = state
+        .db
+        .get_reconciliation_export_job(&id)
+        .await?
+        .ok_or_else(|| AppError::not_found("导出任务不存在"))?;
+    if !user.is_admin() && job.org_name != user.org_name {
+        return Err(AppError::forbidden("无权访问该导出任务"));
+    }
+    if job.status != "completed" {
+        return Err(AppError::new(
+            StatusCode::CONFLICT,
+            "export_not_ready",
+            "导出任务尚未完成",
+        ));
+    }
+    let dir = std::env::var("TSP_RECONCILE_EXPORT_DIR")
+        .unwrap_or_else(|_| "data/reconcile-exports".to_string());
+    let file_path = format!("{dir}/{id}.csv");
+    let bytes = tokio::fs::read(&file_path)
+        .await
+        .map_err(|error| AppError::internal(format!("export read: {error}")))?;
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "text/csv; charset=utf-8")
+        .header(
+            header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"reconciliation-export-{id}.csv\""),
+        )
+        .body(Body::from(bytes))
+        .map_err(|error| AppError::internal(format!("export response: {error}")))
 }

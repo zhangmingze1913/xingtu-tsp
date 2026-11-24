@@ -207,6 +207,23 @@ impl Db {
             "ALTER TABLE timeseries_reconciliations ADD COLUMN org_name VARCHAR(128) NOT NULL DEFAULT ''",
         )
         .await?;
+        self.apply_migration(
+            "0023_reconciliation_export_jobs",
+            "CREATE TABLE IF NOT EXISTS reconciliation_export_jobs (
+                 id VARCHAR(64) PRIMARY KEY,
+                 status VARCHAR(16) NOT NULL,
+                 org_name VARCHAR(128) NOT NULL DEFAULT '',
+                 vehicle_id VARCHAR(64),
+                 consistent INTEGER,
+                 max_rows BIGINT NOT NULL,
+                 rows_written BIGINT NOT NULL DEFAULT 0,
+                 file_path VARCHAR(512),
+                 error TEXT,
+                 created_at VARCHAR(40) NOT NULL,
+                 updated_at VARCHAR(40) NOT NULL
+             )",
+        )
+        .await?;
         Ok(())
     }
 

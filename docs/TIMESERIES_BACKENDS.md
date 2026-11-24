@@ -379,6 +379,26 @@ Grafana 仪表板：[deploy/grafana/tdengine-reconciliation-dashboard.json](../d
 
 注意：这是 bounded smoke benchmark，不是生产容量认证；结果取决于机型、磁盘、网络和 TDengine 版本。
 
+### 导出任务
+
+```http
+POST /api/integrations/timeseries/reconciliations/export/jobs
+GET  /api/integrations/timeseries/reconciliations/export/jobs/{id}
+GET  /api/integrations/timeseries/reconciliations/export/jobs/{id}/download
+```
+
+POST body：
+
+```json
+{"vehicle_id": "optional", "org_name": "optional", "consistent": false, "max_rows": 5000}
+```
+
+- 后台 worker 按 500 行/页写文件
+- 状态：`running` / `completed` / `failed`
+- 文件目录：`TSP_RECONCILE_EXPORT_DIR`
+- 非管理员只能访问本组织任务
+- 进程重启时 `running` 任务不会自动恢复，需要重新提交
+
 ## 12. 客户端分页导出
 
 ```powershell

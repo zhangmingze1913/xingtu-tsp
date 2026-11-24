@@ -133,6 +133,20 @@ pub struct TimeseriesReconciliation {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct ReconciliationExportJob {
+    pub id: String,
+    pub status: String,
+    pub org_name: String,
+    pub vehicle_id: Option<String>,
+    pub consistent: Option<bool>,
+    pub max_rows: i64,
+    pub rows_written: i64,
+    pub error: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct TelemetryRangeStats {
     pub count: i64,
     pub min_ts: Option<String>,

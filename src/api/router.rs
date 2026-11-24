@@ -106,6 +106,18 @@ pub fn build_router(state: AppState) -> Router {
             get(integrations::timeseries_reconciliations_export_page),
         )
         .route(
+            "/integrations/timeseries/reconciliations/export/jobs",
+            axum::routing::post(integrations::start_reconciliation_export_job),
+        )
+        .route(
+            "/integrations/timeseries/reconciliations/export/jobs/{id}",
+            get(integrations::reconciliation_export_job),
+        )
+        .route(
+            "/integrations/timeseries/reconciliations/export/jobs/{id}/download",
+            get(integrations::download_reconciliation_export_job),
+        )
+        .route(
             "/integrations/timeseries/spool",
             get(integrations::timeseries_spool),
         )
