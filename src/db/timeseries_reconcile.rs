@@ -165,6 +165,30 @@ impl Db {
         Ok(())
     }
 
+    pub async fn prune_reconciliation_export_jobs_before(
+        &self,
+        cutoff: &str,
+    ) -> AppResult<Vec<String>> {
+        let rows = self
+            .query(
+                "SELECT id FROM reconciliation_export_jobs
+                 WHERE created_at < ?1 AND status <> 'running'",
+            )
+            .bind(cutoff)
+            .fetch_all(self.pool())
+            .await?;
+        let mut ids = Vec::with_capacity(rows.len());
+        for row in &rows {
+            let id = row.get::<String, _>(0);
+            self.query("DELETE FROM reconciliation_export_jobs WHERE id = ?1")
+                .bind(&id)
+                .execute(self.pool())
+                .await?;
+            ids.push(id);
+        }
+        Ok(ids)
+    }
+
     pub async fn get_reconciliation_export_job(
         &self,
         id: &str,
@@ -326,5 +350,31 @@ mod tests {
             .expect("job");
         assert_eq!(job.status, "completed");
         assert_eq!(job.rows_written, 10);
+    }
+
+    #[tokio::test]
+    async fn export_job_cleanup_skips_running() {
+        let db = Db::in_memory().await.expect("db");
+        let done = db
+            .create_reconciliation_export_job("Org", None, None, 10)
+            .await
+            .expect("create");
+        db.update_reconciliation_export_job(&done, "completed", 1, None, None)
+            .await
+            .expect("update");
+        let running = db
+            .create_reconciliation_export_job("Org", None, None, 10)
+            .await
+            .expect("create");
+        let ids = db
+            .prune_reconciliation_export_jobs_before("2999-01-01T00:00:00Z")
+            .await
+            .expect("prune");
+        assert_eq!(ids, vec![done]);
+        assert!(db
+            .get_reconciliation_export_job(&running)
+            .await
+            .expect("get")
+            .is_some());
     }
 }

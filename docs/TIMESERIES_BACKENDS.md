@@ -398,6 +398,8 @@ POST body：
 - 文件目录：`TSP_RECONCILE_EXPORT_DIR`
 - 非管理员只能访问本组织任务
 - 进程重启时 `running` 任务不会自动恢复，需要重新提交
+- 已完成/失败任务默认保留 24 小时，每小时清理记录与文件
+- `TSP_RECONCILE_EXPORT_RETENTION_HOURS=0` 关闭清理
 
 ## 12. 客户端分页导出
 
