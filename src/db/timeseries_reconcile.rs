@@ -735,4 +735,32 @@ mod tests {
             .await
             .expect("after"));
     }
+
+    #[tokio::test]
+    async fn export_alert_claim_is_atomic_across_pools() {
+        let path = std::env::temp_dir().join(format!("tsp-claim-{}.db", uuid::Uuid::new_v4()));
+        let path_text = path.to_string_lossy().to_string();
+        let db1 = Db::open(&path_text).await.expect("db1");
+        let db2 = Db::open(&path_text).await.expect("db2");
+        let (a, b) = tokio::join!(
+            db1.try_claim_export_alert(
+                "job-concurrent",
+                "2026-11-24T00:05:00Z",
+                "2026-11-24T00:00:00Z"
+            ),
+            db2.try_claim_export_alert(
+                "job-concurrent",
+                "2026-11-24T00:05:00Z",
+                "2026-11-24T00:00:00Z"
+            )
+        );
+        let wins = [a, b]
+            .iter()
+            .filter(|result| matches!(result, Ok(true)))
+            .count();
+        assert_eq!(wins, 1, "exactly one pool must win the claim");
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(path.with_extension("db-wal"));
+        let _ = std::fs::remove_file(path.with_extension("db-shm"));
+    }
 }
