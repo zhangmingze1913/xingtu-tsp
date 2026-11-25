@@ -381,6 +381,7 @@ tdengine::tests::rest_query_maps_rows_to_points
 - `TSP_TEST_POSTGRES_URL` 指向本机 PostgreSQL
 - 两个独立连接池并发 claim 同一导出告警
 - 结果：恰好一个成功
+- 真实 PostgreSQL 导出任务：状态 `completed`，下载 200
 
 验证基线：
 
