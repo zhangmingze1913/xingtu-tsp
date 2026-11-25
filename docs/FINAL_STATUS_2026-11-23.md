@@ -366,3 +366,42 @@ tdengine::tests::rest_query_maps_rows_to_points
 
 真实 TDengine 容器未运行；REST 适配器已用 mock 验证。
 
+## 本地代码收口（2026-11-25）
+
+代码侧规划已全部落地：
+
+- TDengine 可选后端、写入可靠性、spool、对账、告警
+- 对账历史/CSV/游标/导出任务/断点恢复/租约
+- 导出加密、keyring、Vault KV v2、AppRole、Kubernetes auth
+- 下载令牌单次消费、失败告警跨实例去重
+- Grafana、Compose/K8s、运维文档
+
+验证基线：
+
+```text
+lib                    282 passed
+integration            32 passed
+fmt                    clean
+clippy --all-targets   clean
+YAML/JSON              20 files parsed
+PowerShell             9 scripts parsed
+```
+
+当前环境缺失：
+
+```text
+docker / kubectl / vault / taos 均未安装
+FFmpeg 不在 PATH，但测试使用 TSP_FFMPEG 绝对路径
+```
+
+因此以下只能记录、不能伪造：
+
+- 真实 TDengine 容器/集群
+- 真实 Alertmanager/Vault
+- 多实例并发
+- 10 万/百万级压测
+- RWX PVC 挂载
+- Unix 密钥权限测试
+
+本地代码侧没有剩余的、可在当前环境验证的规划项。
+
