@@ -418,6 +418,7 @@ POST body：
 - 非管理员只能访问本组织任务
 - worker 每页检查 `cancelled` 状态，取消后删除临时文件
 - 配置 `TSP_EXPORT_ENCRYPTION_KEY`（base64 32 字节）后，完成任务写 `.csv.enc`
+- `TSP_EXPORT_REQUIRE_ENCRYPTION=true` 时未配置密钥直接失败，避免明文落盘
 - 下载时自动 AES-256-GCM 解密；密钥缺失则下载失败
 - 完成任务的状态响应包含 `download_token`（默认 10 分钟）
 - 无登录下载：`GET /api/integrations/timeseries/reconciliations/export/download/{token}`

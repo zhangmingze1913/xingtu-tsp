@@ -33,6 +33,12 @@ pub fn key_from_env() -> Option<[u8; 32]> {
     Some(key)
 }
 
+pub fn encryption_required() -> bool {
+    std::env::var("TSP_EXPORT_REQUIRE_ENCRYPTION")
+        .map(|value| matches!(value.as_str(), "1" | "true" | "TRUE" | "yes"))
+        .unwrap_or(false)
+}
+
 pub fn encrypt(key: &[u8; 32], plaintext: &[u8]) -> AppResult<Vec<u8>> {
     let cipher = Aes256Gcm::new_from_slice(key)
         .map_err(|error| AppError::internal(format!("export cipher: {error}")))?;
@@ -75,5 +81,14 @@ mod tests {
         let last = tampered.len() - 1;
         tampered[last] ^= 0x01;
         assert!(decrypt(&key, &tampered).is_err());
+    }
+
+    #[test]
+    fn encryption_required_flag_parses_truthy() {
+        std::env::set_var("TSP_EXPORT_REQUIRE_ENCRYPTION", "true");
+        assert!(encryption_required());
+        std::env::set_var("TSP_EXPORT_REQUIRE_ENCRYPTION", "false");
+        assert!(!encryption_required());
+        std::env::remove_var("TSP_EXPORT_REQUIRE_ENCRYPTION");
     }
 }

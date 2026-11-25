@@ -696,6 +696,12 @@ async fn run_reconciliation_export_inner(
     {
         return Ok(());
     }
+    if crate::export_crypto::encryption_required() && crate::export_crypto::key_from_env().is_none()
+    {
+        return Err(AppError::internal(
+            "已启用强制加密，但未配置有效的 TSP_EXPORT_ENCRYPTION_KEY",
+        ));
+    }
     let final_path = format!("{dir}/{id}.csv");
     let encrypted_path = format!("{final_path}.enc");
     let _ = tokio::fs::remove_file(&encrypted_path).await;
