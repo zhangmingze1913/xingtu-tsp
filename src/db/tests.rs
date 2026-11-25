@@ -182,3 +182,39 @@ async fn mysql_connection_smoke() {
     assert_eq!(db.engine_name(), "mysql");
     assert!(db.ping().await.is_ok(), "MySQL ping");
 }
+
+#[tokio::test]
+async fn postgres_connection_smoke() {
+    let Ok(url) = std::env::var("TSP_TEST_POSTGRES_URL") else {
+        return;
+    };
+    let db = Db::open(&url).await.expect("PostgreSQL connection");
+    assert_eq!(db.engine_name(), "postgres");
+    assert!(db.ping().await.is_ok(), "PostgreSQL ping");
+}
+
+#[tokio::test]
+async fn postgis_extension_is_enabled() {
+    let Ok(url) = std::env::var("TSP_TEST_POSTGIS_URL") else {
+        return;
+    };
+    let db = Db::open_with_postgis(&url, true)
+        .await
+        .expect("PostGIS connection");
+    assert!(db.postgis_enabled(), "PostGIS should be enabled");
+    let version: String = sqlx::query_scalar("SELECT postgis_version()")
+        .fetch_one(db.pool())
+        .await
+        .expect("postgis_version");
+    assert!(
+        version.starts_with("3."),
+        "unexpected PostGIS version: {version}"
+    );
+    let index: Option<String> = sqlx::query_scalar(
+        "SELECT indexname::text FROM pg_indexes WHERE tablename = 'telemetry' AND indexname LIKE '%geom%' LIMIT 1",
+    )
+    .fetch_optional(db.pool())
+    .await
+    .expect("geometry index");
+    assert!(index.is_some(), "telemetry geometry/GiST index missing");
+}

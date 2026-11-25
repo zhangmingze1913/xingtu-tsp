@@ -6,6 +6,8 @@
 
 | 组件 | 容器镜像 | 状态 | 证据 |
 | --- | --- | --- | --- |
+| PostgreSQL | `postgis/postgis:16-3.4` | 通过 | schema/migrations/seed/车辆/告警 |
+| PostGIS | `postgis/postgis:16-3.4` | 通过 | 3.4、geometry、GiST/geography、nearby/bbox |
 | MySQL | `mysql:8.0` | 通过 | schema/migrations/seed/车辆/告警 |
 | RustFS | `rustfs/rustfs:latest` | 通过 | 建桶、上传、head-object |
 | TDengine | `tdengine/tdengine:3.3.6.0` | 通过 | REST smoke + API trajectory source=tdengine |
@@ -16,7 +18,45 @@
 | tsink | 源码构建 `tsp-tsink:dev` | 通过 | 真实 `/api/v1/import/prometheus` 写入 |
 | Kubernetes | kind v0.33.0 | 通过 | Deployment 1/1 Running，健康检查、登录、车辆 API |
 
-## 2. MySQL
+## 2. PostgreSQL + PostGIS
+
+```bash
+docker run -d --name tsp-postgis \
+  -e POSTGRES_DB=tsp -e POSTGRES_USER=tsp -e POSTGRES_PASSWORD=tsp-dev-password \
+  -p 55433:5432 postgis/postgis:16-3.4
+
+docker exec tsp-postgis psql -U tsp -d tsp -c 'CREATE EXTENSION IF NOT EXISTS postgis;'
+```
+
+门控测试：
+
+```bash
+TSP_TEST_POSTGRES_URL='postgres://tsp:tsp-dev-password@127.0.0.1:55433/tsp?sslmode=disable' \
+TSP_TEST_POSTGIS_URL="$TSP_TEST_POSTGRES_URL" \
+  cargo test --lib postgres_connection_smoke
+TSP_TEST_POSTGIS_URL="$TSP_TEST_POSTGRES_URL" \
+  cargo test --lib postgis_extension_is_enabled
+```
+
+实测：
+
+```text
+postgis_version 3.4 (GEOS=1 PROJ=1 STATS=1)
+PostGIS geometry columns and spatial indexes enabled
+telemetry geom 264/264 非空
+idx_telemetry_geom  GiST (geom)
+idx_telemetry_geog  GiST ((geom)::geography)
+EXPLAIN 使用 Bitmap Index Scan on idx_telemetry_geog
+nearby=3, bbox=3
+```
+
+应用健康：
+
+```text
+database_engine=postgres
+```
+
+## 3. MySQL
 
 ```bash
 docker run -d --name tsp-mysql \
@@ -46,7 +86,7 @@ alerts 写入/查询成功
 - MySQL 不支持 `CREATE INDEX IF NOT EXISTS`；schema 启动改为容忍 `1061 duplicate key name`。
 - 移除 schema 中与迁移重复的三个索引，避免每次启动告警。
 
-## 3. RustFS
+## 4. RustFS
 
 ```bash
 docker compose -f docker-compose.yml up -d rustfs
@@ -69,7 +109,7 @@ s3 cp sample.h264
 head-object ContentLength=1835
 ```
 
-## 4. TDengine
+## 5. TDengine
 
 ```bash
 docker compose -f docker-compose.yml --profile tdengine up -d tdengine
@@ -92,7 +132,7 @@ trajectory source=tdengine
 TDengine count = 40
 ```
 
-## 5. Vault
+## 6. Vault
 
 ```bash
 docker run -d --name tsp-vault -p 8200:8200 \
@@ -123,7 +163,7 @@ vault export keys synced keys=1
 keys_exists=True
 ```
 
-## 6. Iggy
+## 7. Iggy
 
 ```bash
 docker run -d --name tsp-iggy \
@@ -146,7 +186,7 @@ cargo test --lib iggy_container_roundtrip
 1. Iggy 0.10 HTTP listener 是 h2c-first；reqwest 增加 `http2` feature + `http2_prior_knowledge()`。
 2. 登录响应为 `access_token: {expiry, token}`，适配器同时兼容字符串与对象。
 
-## 7. Walrus
+## 8. Walrus
 
 官方仓库没有可用公开镜像，`nubskr/walrus` / `ghcr.io/nubskr/walrus` 均拉取失败。已从源码构建：
 
@@ -167,7 +207,7 @@ TSP_TEST_WALRUS_ADDR=127.0.0.1:9091
 walrus_container_put_get ... ok
 ```
 
-## 8. tsink
+## 9. tsink
 
 `cantrepro/tsink` 没有官方镜像/Dockerfile。已克隆源码，为其 `tsink-server` crate 编写本地 Dockerfile：
 
@@ -195,7 +235,7 @@ tsink_container_roundtrip ... ok
 - `sample()` 的 2023 时间戳会被默认保留窗口拒绝（422 `write_out_of_retention`）；真实测试使用当前时间。
 - 端点 `/api/v1/import/prometheus` 要求 label 值带引号。
 
-## 9. Kubernetes（kind）
+## 10. Kubernetes（kind）
 
 ```bash
 kind create cluster --name tsp-test
@@ -227,7 +267,7 @@ Docker 构建修复：
 
 完整清单仍使用 PostgreSQL/Redis/RustFS 与 TLS Secret；生产不要用 smoke 清单。
 
-## 10. 结论
+## 11. 结论
 
 已从 mock 推进到真实容器的组件：MySQL、RustFS、TDengine、Vault、Iggy、Redis、Walrus、tsink，以及 Kubernetes smoke。
 

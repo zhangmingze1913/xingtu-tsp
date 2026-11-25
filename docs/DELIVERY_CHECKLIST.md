@@ -4,7 +4,7 @@
 
 - [x] `cargo fmt --check`
 - [x] `cargo clippy --all-targets -- -D warnings`
-- [x] `cargo test --lib`：295 passed
+- [x] `cargo test --lib`：297 passed
 - [x] 集成/协议测试：32 passed
 - [x] `cargo build --release`
 - [x] Git 工作区干净
@@ -17,6 +17,9 @@
 - [x] 真实连接
 - [x] 迁移
 - [x] 跨连接池告警 claim
+- [x] PostGIS 3.4 扩展
+- [x] geometry + GiST + geography 索引
+- [x] nearby/bbox 空间查询
 - [x] 对账导出任务
 - [ ] 生产规模 `EXPLAIN` 调优
 - [ ] 主备切换演练

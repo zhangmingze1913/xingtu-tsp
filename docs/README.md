@@ -59,10 +59,10 @@ STANDARDS_REASSESSMENT_2026-11-21.md
 
 | 项目 | 状态 |
 | --- | --- |
-| 单元/协议测试 | 295 passed |
+| 单元/协议测试 | 297 passed |
 | 集成测试 | 32 passed |
 | fmt / clippy | clean |
-| PostgreSQL 真实连接 | 已验证 |
+| PostgreSQL 真实连接 | 已验证（PostGIS 16-3.4 容器） |
 | KingbaseES V8R6/V9 关系型 | 已验证（容器） |
 | MySQL 8.0 | 已验证（容器） |
 | KGIS 空间扩展 | 未验证（镜像不含插件） |
