@@ -763,4 +763,36 @@ mod tests {
         let _ = std::fs::remove_file(path.with_extension("db-wal"));
         let _ = std::fs::remove_file(path.with_extension("db-shm"));
     }
+
+    #[tokio::test]
+    async fn postgres_cross_pool_export_claim() {
+        let Ok(url) = std::env::var("TSP_TEST_POSTGRES_URL") else {
+            return;
+        };
+        let db1 = Db::open(&url).await.expect("pg db1");
+        let db2 = Db::open(&url).await.expect("pg db2");
+        let id = db1
+            .create_reconciliation_export_job("Org", None, None, 10)
+            .await
+            .expect("job");
+        let (a, b) = tokio::join!(
+            db1.try_claim_export_alert(&id, "2026-11-24T00:05:00Z", "2026-11-24T00:00:00Z"),
+            db2.try_claim_export_alert(&id, "2026-11-24T00:05:00Z", "2026-11-24T00:00:00Z")
+        );
+        let wins = [a, b]
+            .iter()
+            .filter(|result| matches!(result, Ok(true)))
+            .count();
+        assert_eq!(wins, 1, "exactly one PostgreSQL pool must win");
+        let _ = db1
+            .query("DELETE FROM export_alert_state WHERE job_id = ?1")
+            .bind(&id)
+            .execute(db1.pool())
+            .await;
+        let _ = db1
+            .query("DELETE FROM reconciliation_export_jobs WHERE id = ?1")
+            .bind(&id)
+            .execute(db1.pool())
+            .await;
+    }
 }

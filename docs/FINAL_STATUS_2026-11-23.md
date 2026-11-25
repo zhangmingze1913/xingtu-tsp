@@ -376,10 +376,16 @@ tdengine::tests::rest_query_maps_rows_to_points
 - 下载令牌单次消费、失败告警跨实例去重
 - Grafana、Compose/K8s、运维文档
 
+真实 PostgreSQL 验证：
+
+- `TSP_TEST_POSTGRES_URL` 指向本机 PostgreSQL
+- 两个独立连接池并发 claim 同一导出告警
+- 结果：恰好一个成功
+
 验证基线：
 
 ```text
-lib                    282 passed
+lib                    283 passed
 integration            32 passed
 fmt                    clean
 clippy --all-targets   clean

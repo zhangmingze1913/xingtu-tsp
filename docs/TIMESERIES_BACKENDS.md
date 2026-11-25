@@ -309,6 +309,7 @@ GET /api/integrations/timeseries/reconciliations/export/page?limit=500&cursor=<c
 - 同一 job 默认 300s 冷却：`TSP_EXPORT_ALERT_COOLDOWN_SECS`
 - 冷却状态存 `export_alert_state`，多实例共享，跨实例只发一次
 - 并发测试：`export_alert_claim_is_atomic_across_pools`（两个独立连接仅一个 claim 成功）
+- 真实 PostgreSQL：设置 `TSP_TEST_POSTGRES_URL` 后运行 `postgres_cross_pool_export_claim`
 - 指标：`xingtu_reconcile_export_alerts_skipped_total`
 - 指标：`xingtu_reconcile_export_alerts_sent_total`、`failed_total`
 - 指标：`xingtu_tdengine_reconcile_checks_total`、`xingtu_tdengine_reconcile_mismatches_total`
