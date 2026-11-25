@@ -111,18 +111,14 @@ impl Db {
 
     pub async fn alert_stats(&self) -> AppResult<(i64, i64, i64, i64)> {
         let today = china_today_start_utc();
-        let active_row = sqlx::query("SELECT COUNT(*) FROM alerts WHERE acknowledged = 0")
-            .fetch_one(self.pool())
-            .await?;
-        let critical_row = sqlx::query(
-            "SELECT COUNT(*) FROM alerts WHERE acknowledged = 0 AND level = 'critical'",
-        )
-        .fetch_one(self.pool())
-        .await?;
-        let warning_row =
-            sqlx::query("SELECT COUNT(*) FROM alerts WHERE acknowledged = 0 AND level = 'warning'")
-                .fetch_one(self.pool())
-                .await?;
+        let active_sql = self.sql("SELECT COUNT(*) FROM alerts WHERE acknowledged = 0");
+        let active_row = self.query(&active_sql).fetch_one(self.pool()).await?;
+        let critical_sql =
+            self.sql("SELECT COUNT(*) FROM alerts WHERE acknowledged = 0 AND level = 'critical'");
+        let critical_row = self.query(&critical_sql).fetch_one(self.pool()).await?;
+        let warning_sql =
+            self.sql("SELECT COUNT(*) FROM alerts WHERE acknowledged = 0 AND level = 'warning'");
+        let warning_row = self.query(&warning_sql).fetch_one(self.pool()).await?;
         let sql = self.sql("SELECT COUNT(*) FROM alerts WHERE ts >= ?1");
         let today_row = self.query(&sql).bind(&today).fetch_one(self.pool()).await?;
         Ok((

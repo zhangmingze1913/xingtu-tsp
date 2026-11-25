@@ -117,6 +117,15 @@ docker compose -f deploy/kingbase/docker-compose.yml down -v
 - 默认用户/密码
 - `ksql` 是否在 PATH
 
+**必须使用 PostgreSQL 模式**：
+
+```text
+DB_MODE=pg
+ENABLE_CI=no
+```
+
+默认 Oracle 模式会把空字符串当作 NULL，应用会因 `org_name NOT NULL` 失败。
+
 本模板使用：
 
 ```text

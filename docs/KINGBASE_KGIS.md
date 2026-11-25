@@ -119,7 +119,45 @@ Invoke-RestMethod "http://127.0.0.1:8090/api/vehicles/nearby?lat=31.23&lon=121.4
 - 未在真实 KES 上验证 `pg_extension`、advisory lock、KGIS 函数兼容性
 - 未验证 KES 主备切换、长事务、连接池上限
 
-## 9. 自动验证脚本
+## 9. 本机容器实测（2026-11-25）
+
+已验证镜像：
+
+```text
+if010/kingbase:v008r006c008b0014  (V008R006C008B0014)
+if010/kingbase:v009r001c001b0025  (V009R001C001B0025)
+```
+
+启动时必须使用 PostgreSQL 模式：
+
+```bash
+docker run -d --name tsp-kingbase -p 54321:54321 \
+  -e DB_MODE=pg -e ENABLE_CI=no -e NEED_START=yes \
+  -e DB_USER=tsp -e DB_PASSWORD=tsp-dev-password \
+  if010/kingbase:v008r006c008b0014
+```
+
+原因：镜像默认 `DB_MODE=oracle`，会把空字符串视为 NULL，导致 `org_name NOT NULL` 等约束失败。
+
+V8/V9 实测结果：
+
+```text
+容器启动               成功
+CREATE DATABASE tsp    成功
+应用连接               database_engine=kingbase
+schema/migrations      成功
+demo seed              成功（18 台车）
+车辆列表               成功
+telemetry 写入         成功
+trajectory 查询        成功
+告警写入（"level"）    成功
+nearby 查询            成功（lat/lon 降级）
+KGIS 扩展              镜像未包含，未验证
+```
+
+注意：上述镜像是社区镜像，不是官方授权发行版；生产必须使用官方镜像与 License。
+
+## 10. 自动验证脚本
 
 ```bash
 ksql -h KES_HOST -p 54321 -U tsp -d tsp -f scripts/kingbase-verify.sql
@@ -132,7 +170,7 @@ TSP_TEST_KINGBASE_URL='kingbase://tsp:password@kes:54321/tsp?sslmode=disable' \
 cargo test --lib kingbase_connection_smoke
 ```
 
-## 10. 验证清单
+## 11. 验证清单
 
 ```text
 [ ] KingbaseES 可连接（54321）

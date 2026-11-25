@@ -1,0 +1,51 @@
+# Development/test compose for the community if010/kingbase image.
+#
+# This image bundles a trial/embedded license and does NOT require a license
+# mount. It is third-party, not an official KingbaseES distribution; use only
+# for local evaluation. Production must use a vendor-licensed image.
+services:
+  kingbase-v8:
+    image: if010/kingbase:v008r006c008b0014
+    container_name: tsp-kingbase-v8
+    restart: unless-stopped
+    ports:
+      - "54321:54321"
+    environment:
+      DB_MODE: "pg"
+      ENABLE_CI: "no"
+      NEED_START: "yes"
+      DB_USER: tsp
+      DB_PASSWORD: ${KINGBASE_PASSWORD:-tsp-dev-password}
+    volumes:
+      - kingbase-v8-data:/home/kingbase/userdata
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 3 bash -c '</dev/tcp/127.0.0.1/54321' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  kingbase-v9:
+    image: if010/kingbase:v009r001c001b0025
+    container_name: tsp-kingbase-v9
+    restart: unless-stopped
+    ports:
+      - "54322:54321"
+    environment:
+      DB_MODE: "pg"
+      ENABLE_CI: "no"
+      NEED_START: "yes"
+      DB_USER: tsp
+      DB_PASSWORD: ${KINGBASE_PASSWORD:-tsp-dev-password}
+    volumes:
+      - kingbase-v9-data:/home/kingbase/userdata
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 3 bash -c '</dev/tcp/127.0.0.1/54321' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+volumes:
+  kingbase-v8-data:
+  kingbase-v9-data:

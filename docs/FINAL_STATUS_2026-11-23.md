@@ -423,3 +423,11 @@ FFmpeg 不在 PATH，但测试使用 TSP_FFMPEG 绝对路径
 - Kingbase 跳过 `INCLUDE` 覆盖索引，advisory/geography 失败降级
 - 文档：KINGBASE_KGIS.md
 - 真实 KES 未连接验证
+
+
+## KingbaseES 容器实测（2026-11-25）
+
+- 镜像：if010/kingbase V008R006C008B0014 / V009R001C001B0025
+- 模式：DB_MODE=pg（Oracle 模式空串为 NULL，不兼容）
+- 应用：database_engine=kingbase，迁移/seed/轨迹/告警/附近查询通过
+- KGIS：镜像未包含扩展，降级 lat/lon，未验证

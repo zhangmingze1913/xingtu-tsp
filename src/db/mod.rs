@@ -280,7 +280,13 @@ impl Db {
     /// MySQL needs unnamed markers plus reordered arguments, and SQLite accepts
     /// `?N` as-is.
     pub(crate) fn sql<'a>(&self, query: &'a str) -> Cow<'a, str> {
-        Cow::Borrowed(query)
+        if self.kingbase && query.contains("level") {
+            // LEVEL is reserved in KingbaseES; PostgreSQL/SQLite/MySQL do not
+            // need quoting here, so keep their SQL byte-for-byte unchanged.
+            Cow::Owned(query.replace("level", "\"level\""))
+        } else {
+            Cow::Borrowed(query)
+        }
     }
 
     /// Build a backend-portable query from canonical `?N` SQL.

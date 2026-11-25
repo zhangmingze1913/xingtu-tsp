@@ -1,5 +1,7 @@
 //! Schema bootstrap and versioned migrations.
 
+use std::borrow::Cow;
+
 use sqlx::Row;
 
 use crate::error::AppResult;
@@ -13,13 +15,17 @@ const SCHEMA_LOCK_ID: i64 = 8_120_261_116;
 impl Db {
     pub(crate) async fn initialize(&self) -> AppResult<()> {
         let schema = match self.backend {
-            Backend::Sqlite => SQLITE_SCHEMA,
-            Backend::Postgres => POSTGRES_SCHEMA,
-            Backend::Mysql => MYSQL_SCHEMA,
+            Backend::Sqlite => Cow::Borrowed(SQLITE_SCHEMA),
+            Backend::Postgres if self.kingbase => {
+                // LEVEL is reserved in KingbaseES.
+                Cow::Owned(POSTGRES_SCHEMA.replace("level TEXT", "\"level\" TEXT"))
+            }
+            Backend::Postgres => Cow::Borrowed(POSTGRES_SCHEMA),
+            Backend::Mysql => Cow::Borrowed(MYSQL_SCHEMA),
         };
         match self.backend {
             Backend::Sqlite => {
-                sqlx::raw_sql(schema).execute(&self.pool).await?;
+                sqlx::raw_sql(&schema).execute(&self.pool).await?;
             }
             Backend::Postgres => {
                 // Concurrent replicas must not race on CREATE TABLE. Take a
@@ -36,7 +42,7 @@ impl Db {
                         return Err(error.into());
                     }
                 }
-                sqlx::raw_sql(schema).execute(&mut *tx).await?;
+                sqlx::raw_sql(&schema).execute(&mut *tx).await?;
                 tx.commit().await?;
             }
             Backend::Mysql => {
@@ -44,7 +50,7 @@ impl Db {
                 // SQL, so run each DDL statement on its own. `CREATE TABLE IF
                 // NOT EXISTS` keeps bootstrap idempotent.
                 let mut connection = self.pool.acquire().await?;
-                for statement in split_sql_statements(schema) {
+                for statement in split_sql_statements(&schema) {
                     sqlx::query(statement).execute(&mut *connection).await?;
                 }
             }

@@ -16,7 +16,9 @@ services:
     ports:
       - "${KINGBASE_PORT:-54321}:54321"
     environment:
-      ENABLE_CI: "yes"
+      # KES Oracle mode treats '' as NULL; the app requires PostgreSQL mode.
+      DB_MODE: "pg"
+      ENABLE_CI: "no"
       NEED_START: "yes"
       DB_USER: ${KINGBASE_USER:-tsp}
       DB_PASSWORD: ${KINGBASE_PASSWORD:-tsp-dev-password}
