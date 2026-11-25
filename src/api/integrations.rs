@@ -845,13 +845,10 @@ async fn read_export_csv(id: &str) -> AppResult<Vec<u8>> {
         .unwrap_or_else(|_| "data/reconcile-exports".to_string());
     let encrypted_path = format!("{dir}/{id}.csv.enc");
     if tokio::fs::metadata(&encrypted_path).await.is_ok() {
-        let key = crate::export_crypto::key_from_env().ok_or_else(|| {
-            AppError::internal("导出文件已加密，但未配置 TSP_EXPORT_ENCRYPTION_KEY")
-        })?;
         let encoded = tokio::fs::read(&encrypted_path)
             .await
             .map_err(|error| AppError::internal(format!("export read: {error}")))?;
-        return crate::export_crypto::decrypt(&key, &encoded);
+        return crate::export_crypto::decrypt_with_env(&encoded);
     }
     tokio::fs::read(format!("{dir}/{id}.csv"))
         .await

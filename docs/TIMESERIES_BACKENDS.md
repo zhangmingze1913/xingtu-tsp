@@ -418,6 +418,9 @@ POST body：
 - 非管理员只能访问本组织任务
 - worker 每页检查 `cancelled` 状态，取消后删除临时文件
 - 配置 `TSP_EXPORT_ENCRYPTION_KEY`（base64 32 字节）后，完成任务写 `.csv.enc`
+- 轮换：新密钥设 `TSP_EXPORT_ENCRYPTION_KEY`，旧密钥暂设 `TSP_EXPORT_ENCRYPTION_KEY_PREVIOUS`
+- 新文件只用当前密钥；下载先试当前，再回退上一把
+- 旧文件全部重导或过期后可移除 PREVIOUS
 - `TSP_EXPORT_REQUIRE_ENCRYPTION=true` 时未配置密钥直接失败，避免明文落盘
 - 下载时自动 AES-256-GCM 解密；密钥缺失则下载失败
 - 完成任务的状态响应包含 `download_token`（默认 10 分钟）
