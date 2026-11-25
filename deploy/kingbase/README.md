@@ -2,6 +2,12 @@
 
 本目录提供 KingbaseES V8R6 / V9 的容器编排模板。镜像与 License 由人大金仓官方或授权渠道提供，本仓库不附带镜像。
 
+如果本机没有容器运行时，可先执行（需要管理员 + 重启）：
+
+```powershell
+.\scripts\install-container-runtime.ps1
+```
+
 ## 1. 前置条件
 
 - Docker Engine / Docker Desktop / 兼容的容器运行时
