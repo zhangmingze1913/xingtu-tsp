@@ -30,6 +30,18 @@
 | 空间库 | PostgreSQL + PostGIS 或 KingbaseES + KGIS：轨迹/位置 geometry(Point,4326)、GiST 索引、附近/bbox 查询；无扩展时降级 lat/lon |
 | 演示体系 | 18 台车辆、7 日历史、5 个围栏、告警/指令种子数据、内嵌车队模拟器 |
 
+## 1.1 文档入口
+
+交付文档统一入口：[docs/README.md](docs/README.md)。
+
+- [使用手册](docs/USER_GUIDE.md)
+- [技术文档](docs/TECHNICAL_GUIDE.md)
+- [运维手册](docs/OPERATIONS_GUIDE.md)
+- [架构文档](docs/ARCHITECTURE.md)
+- [性能评估](docs/PERFORMANCE_EVALUATION_2026-11-25.md)
+- [使用建议](docs/RECOMMENDATIONS.md)
+- [交付清单](docs/DELIVERY_CHECKLIST.md)
+
 ## 2. 快速启动
 
 ### 环境要求
