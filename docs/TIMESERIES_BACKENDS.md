@@ -437,6 +437,18 @@ TSP_EXPORT_ENCRYPTION_KEY_ID=k2
   - `TSP_EXPORT_ENCRYPTION_KEY_FILE=/etc/tsp/export-keys/key`
   - `TSP_EXPORT_ENCRYPTION_KEY_PREVIOUS_FILE=...`
 - 文件每次使用时重新读取，可通过 Secret/Vault agent 轮换而无需重启
+- 也可由应用直接同步 Vault KV v2：
+
+```bash
+TSP_VAULT_ADDR=https://vault.example
+TSP_VAULT_TOKEN_FILE=/var/run/secrets/vault-token
+TSP_VAULT_SECRET_PATH=secret/data/xingtu/export
+TSP_EXPORT_ENCRYPTION_KEYS_FILE=/etc/tsp/export-keys/keys.json
+TSP_VAULT_SYNC_SECS=300
+```
+
+- 每 300s 拉取 `data.data`，校验 32 字节 base64，原子写 keys 文件
+- 指标：`xingtu_vault_sync_ok_total`、`failed_total`
 - Unix 下密钥文件必须仅 owner 可读写：`chmod 600`；group/world 可读会被拒绝
 - K8s Secret volume 设置 `defaultMode: 0400`
 - K8s 示例：`deploy/k8s/export-encryption-secret.example.yaml`

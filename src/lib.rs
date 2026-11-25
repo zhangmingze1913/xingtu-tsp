@@ -40,6 +40,7 @@ mod tdengine;
 mod tdengine_spool;
 mod timeseries;
 mod util;
+mod vault_keys;
 mod walrus_bus;
 
 // Selected public re-exports for the bundled simulator and library consumers.
@@ -83,6 +84,7 @@ pub async fn run(config: Config) -> AppResult<()> {
     spawn_timeseries_history_pruner(state.clone());
     spawn_reconciliation_export_cleanup(state.clone());
     spawn_reconciliation_export_recovery(state.clone());
+    spawn_vault_key_sync();
 
     spawn_offline_sweeper(state.clone());
     spawn_retention_sweeper(state.clone());
@@ -212,6 +214,56 @@ pub(crate) fn spawn_jt808_kick_subscriber(cluster: &Cluster) {
                 "JT808 session moved; cancelling local connection"
             );
             jt808::cancel_terminal_session(phone);
+        }
+    });
+}
+
+fn spawn_vault_key_sync() {
+    let Ok(addr) = std::env::var("TSP_VAULT_ADDR") else {
+        return;
+    };
+    let Ok(path) = std::env::var("TSP_VAULT_SECRET_PATH") else {
+        return;
+    };
+    let Some(token) = crate::vault_keys::token_from_env() else {
+        tracing::warn!("TSP_VAULT_ADDR set but no Vault token; key sync disabled");
+        return;
+    };
+    let Ok(target) = std::env::var("TSP_EXPORT_ENCRYPTION_KEYS_FILE") else {
+        tracing::warn!("Vault key sync requires TSP_EXPORT_ENCRYPTION_KEYS_FILE");
+        return;
+    };
+    let namespace = std::env::var("TSP_VAULT_NAMESPACE").ok();
+    let interval = std::env::var("TSP_VAULT_SYNC_SECS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .map(|value| value.clamp(30, 86_400))
+        .unwrap_or(300);
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(Duration::from_secs(interval));
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            ticker.tick().await;
+            match crate::vault_keys::sync_once(
+                &addr,
+                &token,
+                &path,
+                namespace.as_deref(),
+                std::path::Path::new(&target),
+            )
+            .await
+            {
+                Ok(keys) => {
+                    crate::vault_keys::VAULT_SYNC_OK
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    tracing::info!(keys, "vault export keys synced");
+                }
+                Err(error) => {
+                    crate::vault_keys::VAULT_SYNC_FAILED
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    tracing::warn!(%error, "vault export key sync failed");
+                }
+            }
         }
     });
 }
