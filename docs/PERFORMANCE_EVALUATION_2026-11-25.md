@@ -164,10 +164,18 @@ lib.rs          696 -> 244 行
 maintenance.rs  461 行
 ```
 
+同时把 `api/integrations.rs` 拆为：
+
+```text
+api/integrations/mod.rs       对账、历史、CSV
+api/integrations/export.rs    导出任务、令牌、失败告警
+```
+
 收益：
 
 - 入口文件只保留装配/生命周期
 - 后台任务集中，便于单独测试和排障
+- 对账与导出边界清晰
 - 降低合并冲突
 
 对运行时性能无直接影响，但降低维护成本。

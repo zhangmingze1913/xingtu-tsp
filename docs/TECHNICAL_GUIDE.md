@@ -58,7 +58,11 @@ src/services/maintenance.rs
 
 ```text
 lib.rs          696 -> 244 行
-maintenance.rs 新增 461 行
+maintenance.rs  新增 461 行
+
+api/integrations.rs
+  -> api/integrations/mod.rs      对账/历史/CSV
+  -> api/integrations/export.rs   导出任务/令牌/失败告警
 ```
 
 入口文件只保留：
@@ -75,7 +79,7 @@ maintenance.rs 新增 461 行
 | `standards/jt809.rs` | ~4.3k | 帧/加密/业务/测试集中 | 拆 `frame`/`crypto`/`business` |
 | `standards/gb32960.rs` | ~3.5k | 编解码与测试集中 | 拆 `codec`/`state`/`tests` |
 | `jt808/control.rs` | ~3.0k | 控制消息集中 | 按 0x8xxx 分组 |
-| `api/integrations.rs` | ~1.2k | 对账、导出、令牌、告警混合 | 拆 `integrations::reconcile` / `export` |
+| `api/integrations/` | mod ~0.5k + export ~0.7k | 已拆出导出任务/令牌/告警 | 可继续拆 `reconcile` |
 | `tdengine.rs` | ~1.0k | 客户端、写入、查询、告警 | 拆 `client`/`writer`/`alert` |
 
 这些是后续可维护性优化项，不影响当前功能。
