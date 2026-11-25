@@ -4,7 +4,7 @@
 
 - [x] `cargo fmt --check`
 - [x] `cargo clippy --all-targets -- -D warnings`
-- [x] `cargo test --lib`：286 passed
+- [x] `cargo test --lib`：291 passed
 - [x] 集成/协议测试：32 passed
 - [x] `cargo build --release`
 - [x] Git 工作区干净
@@ -53,6 +53,18 @@
 - [ ] 转封装播放
 - [ ] 保留策略
 - [ ] spool 持久卷
+
+## 3.1 可选存储/中间件微测试
+
+- [x] Iggy HTTP mock
+- [x] Walrus TCP mock
+- [x] tsink HTTP mock
+- [x] Redis 真实 session（门控）
+- [x] RustFS S3 mock
+- [x] TDengine REST mock
+- [x] Vault mock
+- [ ] 真实 Iggy/Walrus/tsink/Redis 集群
+- [ ] 真实 RustFS/TDengine
 
 ## 4. 安全
 

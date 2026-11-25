@@ -558,4 +558,21 @@ mod tests {
     fn session_key_is_namespaced() {
         assert_eq!(session_key("013800000001"), "tsp:session:013800000001");
     }
+
+    #[tokio::test]
+    async fn redis_session_roundtrip() {
+        let Ok(url) = std::env::var("TSP_TEST_REDIS_URL") else {
+            return;
+        };
+        let cluster = Cluster::connect(&url, "test-api", "api")
+            .await
+            .expect("redis cluster");
+        let phone = format!("test-{}", uuid::Uuid::new_v4());
+        cluster.register_session(&phone, "peer-node").await;
+        let session = cluster.lookup_session(&phone).await;
+        assert_eq!(
+            session.map(|session| session.peer),
+            Some("peer-node".to_string())
+        );
+    }
 }

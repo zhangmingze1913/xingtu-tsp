@@ -58,7 +58,7 @@ STANDARDS_REASSESSMENT_2026-11-21.md
 
 | 项目 | 状态 |
 | --- | --- |
-| 单元/协议测试 | 286 passed |
+| 单元/协议测试 | 291 passed |
 | 集成测试 | 32 passed |
 | fmt / clippy | clean |
 | PostgreSQL 真实连接 | 已验证 |

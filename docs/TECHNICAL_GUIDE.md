@@ -259,11 +259,40 @@ cargo test --test auth --test vehicles --test standards --test storage --test cl
 当前基线：
 
 ```text
-lib 286 passed
+lib 291 passed
 integration 32 passed
 fmt clean
 clippy --all-targets clean
 ```
+
+## 10.1 可选存储/中间件微测试
+
+已覆盖：
+
+```text
+Iggy          HTTP login/send/poll/commit 语义（mock）
+Walrus        REGISTER/PUT TCP 帧（mock TCP）
+tsink         Prometheus import 文本、Bearer、失败状态（mock HTTP）
+Redis         session SET/GET（真实容器，环境变量门控）
+RustFS        上传/分页/清理/spool（S3 mock）
+TDengine      query/range/retry/spool（REST mock）
+Vault         KV v2/AppRole/K8s login（mock HTTP）
+```
+
+Redis 真实测试：
+
+```bash
+docker run -d --name tsp-test-redis -p 56379:6379 redis:7-alpine
+TSP_TEST_REDIS_URL=redis://127.0.0.1:56379/8 cargo test --lib redis_session_roundtrip
+```
+
+Kingbase 真实测试：
+
+```bash
+TSP_TEST_KINGBASE_URL='kingbase://...' cargo test --lib kingbase_connection_smoke
+```
+
+没有设置环境变量时，这些测试会跳过，不会伪造通过。
 
 ## 11. 扩展点
 

@@ -445,4 +445,87 @@ mod tests {
         assert_eq!(encoded, "AAAAAA==");
         assert_eq!(BASE64.decode(encoded).unwrap(), 0u32.to_be_bytes());
     }
+
+    #[tokio::test]
+    async fn http_send_poll_commit_roundtrip() {
+        use std::sync::{Arc, Mutex};
+
+        use axum::{
+            extract::State,
+            http::{HeaderMap, StatusCode},
+            routing::{post, put},
+            Json, Router,
+        };
+
+        type Seen = Arc<Mutex<Vec<(String, String)>>>;
+        async fn send(
+            State(seen): State<Seen>,
+            headers: HeaderMap,
+            Json(body): Json<Value>,
+        ) -> StatusCode {
+            let payload = body["messages"][0]["payload"].as_str().unwrap_or_default();
+            seen.lock().unwrap().push((
+                "send".to_string(),
+                format!(
+                    "{}:{}",
+                    headers
+                        .get("authorization")
+                        .and_then(|v| v.to_str().ok())
+                        .unwrap_or(""),
+                    payload
+                ),
+            ));
+            StatusCode::OK
+        }
+        async fn poll(State(seen): State<Seen>) -> Json<Value> {
+            seen.lock()
+                .unwrap()
+                .push(("poll".to_string(), String::new()));
+            Json(json!({
+                "messages": [{
+                    "payload": BASE64.encode("hello"),
+                    "header": {"offset": 7}
+                }]
+            }))
+        }
+        async fn commit(State(seen): State<Seen>, Json(body): Json<Value>) -> StatusCode {
+            seen.lock()
+                .unwrap()
+                .push(("commit".to_string(), body["offset"].to_string()));
+            StatusCode::OK
+        }
+
+        let seen: Seen = Arc::new(Mutex::new(Vec::new()));
+        let app = Router::new()
+            .route("/streams/1/topics/2/messages", post(send).get(poll))
+            .route("/streams/1/topics/2/consumer-offsets", put(commit))
+            .with_state(seen.clone());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        let http = IggyHttp {
+            client: reqwest::Client::new(),
+            base: format!("http://{addr}"),
+            token: "token".to_string(),
+            stream_id: 1,
+            topic_id: 2,
+        };
+        http.send("world").await.expect("send");
+        let (messages, next) = http.poll(7, 0).await.expect("poll");
+        assert_eq!(messages, vec!["hello".to_string()]);
+        assert_eq!(next, 8);
+        http.commit(7, 8).await.expect("commit");
+        let seen = seen.lock().unwrap();
+        assert!(seen
+            .iter()
+            .any(|(kind, value)| kind == "send" && value.contains(&BASE64.encode("world"))));
+        assert!(seen.iter().any(|(kind, _)| kind == "poll"));
+        assert!(seen
+            .iter()
+            .any(|(kind, value)| kind == "commit" && value == "8"));
+    }
 }

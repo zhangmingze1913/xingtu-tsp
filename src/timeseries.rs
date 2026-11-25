@@ -275,3 +275,89 @@ async fn write_sample(
 fn escape_label(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample() -> Sample {
+        Sample {
+            vehicle_id: "veh\"1".to_string(),
+            ts_ms: 1_700_000_000_000,
+            lat: 31.2,
+            lon: 121.4,
+            speed: 50.0,
+            heading: 90.0,
+            ignition: true,
+            soc: 80.0,
+            odometer_km: 100.0,
+        }
+    }
+
+    #[tokio::test]
+    async fn tsink_import_posts_prometheus_text_and_bearer() {
+        use std::sync::{Arc, Mutex};
+
+        use axum::{
+            extract::State,
+            http::{HeaderMap, StatusCode},
+            routing::post,
+            Router,
+        };
+
+        type Seen = Arc<Mutex<Option<(String, String)>>>;
+        async fn import(State(seen): State<Seen>, headers: HeaderMap, body: String) -> StatusCode {
+            let auth = headers
+                .get("authorization")
+                .and_then(|value| value.to_str().ok())
+                .unwrap_or_default()
+                .to_string();
+            *seen.lock().unwrap() = Some((auth, body));
+            StatusCode::OK
+        }
+
+        let seen: Seen = Arc::new(Mutex::new(None));
+        let app = Router::new()
+            .route("/api/v1/import/prometheus", post(import))
+            .with_state(seen.clone());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        write_sample(
+            &Client::new(),
+            &format!("http://{addr}"),
+            Some("tsink-token"),
+            &sample(),
+        )
+        .await
+        .expect("write");
+        let (auth, body) = seen.lock().unwrap().clone().expect("seen");
+        assert_eq!(auth, "Bearer tsink-token");
+        assert!(body.contains("tsp_lat{vehicle_id=\"veh\\\"1\"}"));
+        assert!(body.contains("1700000000000"));
+    }
+
+    #[tokio::test]
+    async fn tsink_import_rejects_non_success() {
+        use axum::{routing::post, Router};
+        async fn fail() -> axum::http::StatusCode {
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR
+        }
+        let app = Router::new().route("/api/v1/import/prometheus", post(fail));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        let error = write_sample(&Client::new(), &format!("http://{addr}"), None, &sample())
+            .await
+            .expect_err("must fail");
+        assert!(error.to_string().contains("tsink"));
+    }
+}

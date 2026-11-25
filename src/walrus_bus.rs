@@ -143,4 +143,51 @@ mod tests {
     fn truncation_is_bounded() {
         assert_eq!(truncate(&"x".repeat(300)).len(), 200);
     }
+
+    #[tokio::test]
+    async fn tcp_register_and_put_roundtrip() {
+        use tokio::{
+            io::{AsyncReadExt, AsyncWriteExt},
+            net::TcpListener,
+            sync::oneshot,
+        };
+
+        async fn read_frame(stream: &mut tokio::net::TcpStream) -> String {
+            let mut length = [0u8; 4];
+            stream.read_exact(&mut length).await.expect("length");
+            let mut body = vec![0u8; u32::from_le_bytes(length) as usize];
+            stream.read_exact(&mut body).await.expect("body");
+            String::from_utf8(body).expect("utf8")
+        }
+
+        async fn write_ok(stream: &mut tokio::net::TcpStream) {
+            let body = b"OK";
+            stream
+                .write_all(&(body.len() as u32).to_le_bytes())
+                .await
+                .expect("len");
+            stream.write_all(body).await.expect("body");
+        }
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        let (tx, rx) = oneshot::channel();
+        tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.expect("accept");
+            assert_eq!(read_frame(&mut stream).await, "REGISTER events");
+            write_ok(&mut stream).await;
+            let put = read_frame(&mut stream).await;
+            let _ = tx.send(put);
+            write_ok(&mut stream).await;
+        });
+        let bus = WalrusBus::connect(&addr.to_string(), "events")
+            .await
+            .expect("connect");
+        bus.publish("hello".to_string());
+        let put = tokio::time::timeout(Duration::from_secs(2), rx)
+            .await
+            .expect("timeout")
+            .expect("put");
+        assert_eq!(put, "PUT events hello");
+    }
 }
