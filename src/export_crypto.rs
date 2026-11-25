@@ -41,8 +41,34 @@ fn key_from_var(name: &str) -> Option<[u8; 32]> {
     key
 }
 
+fn key_file_is_private(path: &std::path::Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        match std::fs::metadata(path) {
+            Ok(meta) if meta.permissions().mode() & 0o077 != 0 => {
+                tracing::warn!(
+                    path = %path.display(),
+                    "export key file is group/world accessible; use chmod 600 or a 0400 Secret"
+                );
+                return false;
+            }
+            Ok(_) => true,
+            Err(_) => false,
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        true
+    }
+}
+
 fn keyring_from_file() -> Option<HashMap<String, [u8; 32]>> {
     let path = std::env::var("TSP_EXPORT_ENCRYPTION_KEYS_FILE").ok()?;
+    if !key_file_is_private(std::path::Path::new(path.trim())) {
+        return None;
+    }
     let raw = std::fs::read_to_string(path.trim()).ok()?;
     let Value::Object(map) = serde_json::from_str::<Value>(&raw).ok()? else {
         tracing::warn!("export encryption keyring file must be a JSON object");
@@ -59,6 +85,9 @@ fn keyring_from_file() -> Option<HashMap<String, [u8; 32]>> {
 
 fn key_from_file(name: &str) -> Option<[u8; 32]> {
     let path = std::env::var(name).ok()?;
+    if !key_file_is_private(std::path::Path::new(path.trim())) {
+        return None;
+    }
     let raw = std::fs::read_to_string(path.trim()).ok()?;
     decode_key(&raw)
 }
@@ -305,6 +334,27 @@ mod tests {
             b"single-file"
         );
         clear_env();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn key_file_permissions_are_enforced() {
+        use std::os::unix::fs::PermissionsExt;
+        let _guard = ENV_LOCK.lock().unwrap();
+        clear_env();
+        let dir = std::env::temp_dir().join(format!("tsp-keyperm-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).expect("dir");
+        let path = dir.join("key");
+        std::fs::write(
+            &path,
+            base64::engine::general_purpose::STANDARD.encode([4u8; 32]),
+        )
+        .expect("write");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).expect("chmod");
+        assert!(key_file_is_private(&path));
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).expect("chmod");
+        assert!(!key_file_is_private(&path));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

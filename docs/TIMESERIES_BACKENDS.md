@@ -431,6 +431,8 @@ TSP_EXPORT_ENCRYPTION_KEY_ID=k2
   - `TSP_EXPORT_ENCRYPTION_KEY_FILE=/etc/tsp/export-keys/key`
   - `TSP_EXPORT_ENCRYPTION_KEY_PREVIOUS_FILE=...`
 - 文件每次使用时重新读取，可通过 Secret/Vault agent 轮换而无需重启
+- Unix 下密钥文件必须仅 owner 可读写：`chmod 600`；group/world 可读会被拒绝
+- K8s Secret volume 设置 `defaultMode: 0400`
 - K8s 示例：`deploy/k8s/export-encryption-secret.example.yaml`
 - 解密按文件头 key id 选择密钥；旧格式文件回退尝试已配置密钥
 - 简化轮换：新密钥设 `TSP_EXPORT_ENCRYPTION_KEY`，旧密钥暂设 `TSP_EXPORT_ENCRYPTION_KEY_PREVIOUS`
