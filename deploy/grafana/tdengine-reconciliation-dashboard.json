@@ -475,6 +475,11 @@
           "expr": "sum(increase(xingtu_reconcile_export_alerts_failed_total[24h]))",
           "legendFormat": "failed/24h",
           "refId": "B"
+        },
+        {
+          "expr": "sum(increase(xingtu_reconcile_export_alerts_skipped_total[24h]))",
+          "legendFormat": "skipped/24h",
+          "refId": "C"
         }
       ],
       "title": "Export failure alerts / 24h",

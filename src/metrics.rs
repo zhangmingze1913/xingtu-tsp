@@ -195,6 +195,12 @@ impl Metrics {
             archive.playback_cache_miss
         ));
         let tdengine = crate::tdengine::stats();
+        out.push_str("# HELP xingtu_reconcile_export_alerts_skipped_total Export failure alerts skipped by cooldown.\n");
+        out.push_str("# TYPE xingtu_reconcile_export_alerts_skipped_total counter\n");
+        out.push_str(&format!(
+            "xingtu_reconcile_export_alerts_skipped_total {}\n",
+            tdengine.export_alerts_skipped
+        ));
         out.push_str(
             "# HELP xingtu_reconcile_export_alerts_sent_total Export failure alerts sent.\n",
         );

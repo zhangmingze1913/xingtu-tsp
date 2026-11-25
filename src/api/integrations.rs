@@ -868,11 +868,42 @@ fn export_failure_payload(format: &str, job_id: &str, error: &str) -> Value {
     }
 }
 
+static EXPORT_ALERT_LAST: std::sync::OnceLock<
+    std::sync::Mutex<std::collections::HashMap<String, i64>>,
+> = std::sync::OnceLock::new();
+
+fn export_alert_allowed(job_id: &str, now: i64, cooldown: i64) -> bool {
+    let map =
+        EXPORT_ALERT_LAST.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+    let Ok(mut map) = map.lock() else {
+        return true;
+    };
+    if map.len() > 1024 {
+        map.retain(|_, at| now - *at < cooldown);
+    }
+    if let Some(previous) = map.get(job_id) {
+        if now - *previous < cooldown {
+            return false;
+        }
+    }
+    map.insert(job_id.to_string(), now);
+    true
+}
+
 async fn notify_export_failure(job_id: &str, error: &str) {
     let Ok(url) = std::env::var("TSP_RECONCILE_ALERT_WEBHOOK") else {
         return;
     };
     if url.trim().is_empty() {
+        return;
+    }
+    let cooldown = std::env::var("TSP_EXPORT_ALERT_COOLDOWN_SECS")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(300)
+        .max(1);
+    if !export_alert_allowed(job_id, chrono::Utc::now().timestamp(), cooldown) {
+        crate::tdengine::EXPORT_ALERTS_SKIPPED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         return;
     }
     let format =
@@ -1152,6 +1183,14 @@ mod token_tests {
         let mut tampered = token.clone();
         tampered.push('0');
         assert!(verify_export_token(&tampered).is_none());
+    }
+
+    #[test]
+    fn export_failure_alert_cooldown_is_per_job() {
+        assert!(export_alert_allowed("dedupe-a", 100, 300));
+        assert!(!export_alert_allowed("dedupe-a", 101, 300));
+        assert!(export_alert_allowed("dedupe-b", 101, 300));
+        assert!(export_alert_allowed("dedupe-a", 401, 300));
     }
 
     #[test]

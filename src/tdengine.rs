@@ -48,6 +48,7 @@ pub static EXPORT_JOBS_RESUMED: AtomicU64 = AtomicU64::new(0);
 pub static EXPORT_JOBS_RECOVERED: AtomicU64 = AtomicU64::new(0);
 pub static EXPORT_ALERTS_SENT: AtomicU64 = AtomicU64::new(0);
 pub static EXPORT_ALERTS_FAILED: AtomicU64 = AtomicU64::new(0);
+pub static EXPORT_ALERTS_SKIPPED: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TdengineStats {
@@ -71,6 +72,7 @@ pub struct TdengineStats {
     pub export_jobs_recovered: u64,
     pub export_alerts_sent: u64,
     pub export_alerts_failed: u64,
+    pub export_alerts_skipped: u64,
 }
 
 pub fn stats() -> TdengineStats {
@@ -95,6 +97,7 @@ pub fn stats() -> TdengineStats {
         export_jobs_recovered: EXPORT_JOBS_RECOVERED.load(Ordering::Relaxed),
         export_alerts_sent: EXPORT_ALERTS_SENT.load(Ordering::Relaxed),
         export_alerts_failed: EXPORT_ALERTS_FAILED.load(Ordering::Relaxed),
+        export_alerts_skipped: EXPORT_ALERTS_SKIPPED.load(Ordering::Relaxed),
     }
 }
 
