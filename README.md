@@ -119,7 +119,7 @@ Browser ── HTTPS / WebSocket ──> Axum API ──> services::telemetry
 ```
 
 - 业务数据只写 PostgreSQL/PostGIS 或 KingbaseES/KGIS；SQLite/MySQL 是兼容/演示后端。
-- 信创部署见 [docs/KINGBASE_KGIS.md](docs/KINGBASE_KGIS.md)。
+- 信创部署见 [docs/KINGBASE_KGIS.md](docs/KINGBASE_KGIS.md)，容器模板见 [deploy/kingbase/README.md](deploy/kingbase/README.md)。
 - Redis 只做短期协调与实时广播，不承载业务真相。
 - Iggy/Walrus、tsink/TDengine、OpenRaft 均为可选组件，默认拓扑不依赖。
 - JT808 支持 TLS/mTLS + CIDR 白名单；JWT 使用 RS256/JWKS + refresh 轮换 + jti 吊销。

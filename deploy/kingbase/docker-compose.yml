@@ -1,0 +1,39 @@
+# KingbaseES container deployment.
+#
+# This file is intentionally image-agnostic: KingbaseES images are distributed
+# by the vendor or through licensed channels. Set KINGBASE_IMAGE and
+# KINGBASE_LICENSE_FILE before starting.
+#
+# Example:
+#   $env:KINGBASE_IMAGE="<vendor-registry>/kingbase:v8r6"
+#   $env:KINGBASE_LICENSE_FILE="C:\kingbase\license.dat"
+#   docker compose -f deploy/kingbase/docker-compose.yml up -d
+services:
+  kingbase:
+    image: ${KINGBASE_IMAGE:?set KINGBASE_IMAGE to a licensed KingbaseES V8R6/V9 image}
+    container_name: ${KINGBASE_CONTAINER:-tsp-kingbase}
+    restart: unless-stopped
+    ports:
+      - "${KINGBASE_PORT:-54321}:54321"
+    environment:
+      ENABLE_CI: "yes"
+      NEED_START: "yes"
+      DB_USER: ${KINGBASE_USER:-tsp}
+      DB_PASSWORD: ${KINGBASE_PASSWORD:-tsp-dev-password}
+      DB_NAME: ${KINGBASE_DB:-tsp}
+    volumes:
+      - kingbase-data:/opt/kingbase/ES/data
+      - ${KINGBASE_LICENSE_FILE:?set KINGBASE_LICENSE_FILE}:/opt/kingbase/ES/license.dat:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "timeout 3 bash -c '</dev/tcp/127.0.0.1/54321' || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+volumes:
+  kingbase-data:

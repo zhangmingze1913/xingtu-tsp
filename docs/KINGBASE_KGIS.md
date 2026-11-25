@@ -9,6 +9,8 @@
 - 需要轨迹/车辆位置的 geometry、附近查询、bbox 查询
 - 希望保留与 PostgreSQL/PostGIS 相同的业务 SQL 与 API
 
+容器部署模板见 [deploy/kingbase/README.md](../deploy/kingbase/README.md)。
+
 ## 2. 连接方式
 
 ```bash
