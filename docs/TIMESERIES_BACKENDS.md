@@ -418,7 +418,16 @@ POST body：
 - 非管理员只能访问本组织任务
 - worker 每页检查 `cancelled` 状态，取消后删除临时文件
 - 配置 `TSP_EXPORT_ENCRYPTION_KEY`（base64 32 字节）后，完成任务写 `.csv.enc`
-- 轮换：新密钥设 `TSP_EXPORT_ENCRYPTION_KEY`，旧密钥暂设 `TSP_EXPORT_ENCRYPTION_KEY_PREVIOUS`
+- 新文件头写入密钥 ID：`TSPENC1 | id_len | id | nonce | ciphertext`
+- 多版本密钥环：
+
+```bash
+TSP_EXPORT_ENCRYPTION_KEYS='{"k2":"<base64>","k1":"<base64>"}'
+TSP_EXPORT_ENCRYPTION_KEY_ID=k2
+```
+
+- 解密按文件头 key id 选择密钥；旧格式文件回退尝试已配置密钥
+- 简化轮换：新密钥设 `TSP_EXPORT_ENCRYPTION_KEY`，旧密钥暂设 `TSP_EXPORT_ENCRYPTION_KEY_PREVIOUS`
 - 新文件只用当前密钥；下载先试当前，再回退上一把
 - 旧文件全部重导或过期后可移除 PREVIOUS
 - `TSP_EXPORT_REQUIRE_ENCRYPTION=true` 时未配置密钥直接失败，避免明文落盘

@@ -818,11 +818,11 @@ async fn run_reconciliation_export_inner(
         .db
         .update_reconciliation_export_progress(id, written, None, None)
         .await?;
-    let stored_path = if let Some(key) = crate::export_crypto::key_from_env() {
+    let stored_path = if crate::export_crypto::encryption_configured() {
         let plaintext = tokio::fs::read(&final_path)
             .await
             .map_err(|error| AppError::internal(format!("export read for encryption: {error}")))?;
-        let encrypted = crate::export_crypto::encrypt(&key, &plaintext)?;
+        let encrypted = crate::export_crypto::encrypt_with_env(&plaintext)?;
         tokio::fs::write(&encrypted_path, encrypted)
             .await
             .map_err(|error| AppError::internal(format!("export encrypt write: {error}")))?;
