@@ -33,6 +33,7 @@ API.md                     HTTP API
 SECURITY.md                安全与密钥
 CLUSTER.md                 集群与 Raft
 POSTGIS.md                 空间数据
+POSTGRES_HA.md             PostgreSQL 主从
 KINGBASE_KGIS.md           信创 KingbaseES/KGIS
 TIMESERIES_BACKENDS.md     TDengine 选型
 TIMESERIES_OPERATIONS.md   TDengine 运维
@@ -63,6 +64,7 @@ STANDARDS_REASSESSMENT_2026-11-21.md
 | 集成测试 | 32 passed |
 | fmt / clippy | clean |
 | PostgreSQL 真实连接 | 已验证（PostGIS 16-3.4 容器） |
+| PostgreSQL 主从 | 已验证（流复制/promote smoke） |
 | KingbaseES V8R6/V9 关系型 | 已验证（容器） |
 | MySQL 8.0 | 已验证（容器） |
 | KGIS 空间扩展 | 未验证（镜像不含插件） |

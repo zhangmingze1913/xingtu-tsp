@@ -132,6 +132,16 @@ docker logs -f xingtu-tsp
 
 每次备份生成 `.manifest.json`，包含 SHA-256。
 
+### PostgreSQL 主从
+
+手工流复制/promote smoke：
+
+```powershell
+pwsh -File scripts/postgres-ha-smoke.ps1 -Promote
+```
+
+详见 [POSTGRES_HA.md](POSTGRES_HA.md)。这是手工基线，不是自动 failover。
+
 ### KingbaseES 备份
 
 使用 `sys_dump` / `ksql`，按厂商工具执行。应用侧只保证 schema 兼容；备份策略由 KES 平台负责。

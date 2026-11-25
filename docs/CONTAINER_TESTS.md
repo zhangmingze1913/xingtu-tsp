@@ -8,6 +8,7 @@
 | --- | --- | --- | --- |
 | PostgreSQL | `postgis/postgis:16-3.4` | 通过 | schema/migrations/seed/车辆/告警 |
 | PostGIS | `postgis/postgis:16-3.4` | 通过 | 3.4、geometry、GiST/geography、nearby/bbox |
+| PostgreSQL HA | `postgres:16` x2 | 通过 | 流复制、只读从库、手工 promote |
 | MySQL | `mysql:8.0` | 通过 | schema/migrations/seed/车辆/告警 |
 | RustFS | `rustfs/rustfs:latest` | 通过 | 建桶、上传、head-object |
 | TDengine | `tdengine/tdengine:3.3.6.0` | 通过 | REST smoke + API trajectory source=tdengine |
@@ -55,6 +56,43 @@ nearby=3, bbox=3
 ```text
 database_engine=postgres
 ```
+
+### 2.1 PostGIS 10 万/100 万
+
+```bash
+psql -U tsp -d tsp -v rows=100000 -f scripts/postgis-bench.sql
+psql -U tsp -d tsp -v rows=1000000 -f scripts/postgis-bench.sql
+```
+
+实测：
+
+```text
+10 万：nearby 938 ms，bbox 48 ms
+100 万：nearby 14.6 s，bbox 348 ms
+100 万：geom 1000000/1000000，表 578 MB，索引 404 MB
+```
+
+两个查询都使用 GiST Bitmap Index Scan。详见 [POSTGIS.md](POSTGIS.md)。
+
+### 2.2 PostgreSQL 主从
+
+```powershell
+pwsh -File scripts/postgres-ha-smoke.ps1 -Promote
+```
+
+实测：
+
+```text
+pg_is_in_recovery = t
+pg_stat_replication = streaming|async
+lag_bytes = 0
+replica SELECT = primary
+replica INSERT = read-only 拒绝
+promote = 成功
+promoted INSERT = ok
+```
+
+详见 [POSTGRES_HA.md](POSTGRES_HA.md)。这是手工基线，不是自动 failover。
 
 ## 3. MySQL
 

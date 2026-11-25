@@ -22,7 +22,10 @@
 - [x] nearby/bbox 空间查询
 - [x] 对账导出任务
 - [ ] 生产规模 `EXPLAIN` 调优
-- [ ] 主备切换演练
+- [x] 流复制 smoke
+- [x] 只读从库
+- [x] 手工 promote
+- [ ] 自动 failover/生产切换
 
 ### KingbaseES
 

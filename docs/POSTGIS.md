@@ -92,3 +92,51 @@ PostGIS：`ST_Intersects(geom, ST_MakeEnvelope(min_lon,min_lat,max_lon,max_lat,4
 ## KingbaseES / KGIS
 
 信创环境可使用 KingbaseES + KGIS 替代 PostgreSQL + PostGIS，连接串与限制见 [KINGBASE_KGIS.md](KINGBASE_KGIS.md)。
+
+
+## 6. 10 万/100 万级空间基准（2026-11-25）
+
+容器：
+
+```text
+postgis/postgis:16-3.4
+PostgreSQL 16.16
+PostGIS 3.4
+```
+
+脚本：
+
+```bash
+psql -U tsp -d tsp -v rows=100000 -f scripts/postgis-bench.sql
+psql -U tsp -d tsp -v rows=1000000 -f scripts/postgis-bench.sql
+```
+
+数据：
+
+```text
+100 万行：geom 1000000/1000000
+总大小 578 MB
+heap 174 MB
+indexes 404 MB
+```
+
+查询（`count(*)`，5 km 半径 / 约 0.15° bbox）：
+
+| 规模 | nearby | bbox |
+| --- | ---: | ---: |
+| 10 万 | 938 ms | 48 ms |
+| 100 万 | 14.6 s | 348 ms |
+
+计划：
+
+```text
+nearby: Bitmap Index Scan on idx_telemetry_geog
+bbox:   Bitmap Index Scan on idx_telemetry_geom
+```
+
+说明：
+
+- 这是全量 `count(*)`，不是分页 API；分页应加 LIMIT 并避免全量聚合。
+- 100 万级 nearby 14.6s 表明 geography 距离过滤仍重；生产应按时间分区/缩小时间窗，或把高频轨迹交给 TDengine/tsink。
+- bbox 348ms 说明 GiST 几何索引可用。
+- 结果来自 4 vCPU / 12 GB Docker Desktop，不是生产容量承诺。

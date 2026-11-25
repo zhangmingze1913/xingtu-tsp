@@ -199,3 +199,37 @@ api/integrations/export.rs    导出任务、令牌、失败告警
 - 未测百万级当前版本
 
 > 本报告只证明“当前环境可运行、基本延迟可接受”，不构成生产容量承诺。
+
+
+## 9. PostGIS 空间规模复测
+
+环境：`postgis/postgis:16-3.4`，PostgreSQL 16.16，4 vCPU/12 GB。
+
+数据：
+
+```text
+100 万行，geom 1000000/1000000
+总大小 578 MB
+heap 174 MB
+indexes 404 MB
+```
+
+`count(*)` 查询：
+
+| 规模 | 5 km nearby | 0.15° bbox |
+| --- | ---: | ---: |
+| 10 万 | 938 ms | 48 ms |
+| 100 万 | 14.6 s | 348 ms |
+
+计划：
+
+```text
+nearby: Bitmap Index Scan on idx_telemetry_geog
+bbox:   Bitmap Index Scan on idx_telemetry_geom
+```
+
+结论：
+
+- bbox 在 100 万级仍为百毫秒级，GiST 有效。
+- nearby 的 geography 距离计算在 100 万级达到 14.6s；必须加时间窗/分页/分区，或把高频轨迹交给 TDengine。
+- 这是全量 count，不是分页 API 延迟。
