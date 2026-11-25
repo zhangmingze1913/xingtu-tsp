@@ -205,6 +205,10 @@ LB -> Gateway x N
 
 ## 11. 相关文档
 
+- [架构图集](ARCHITECTURE_DIAGRAMS.md)
+- [技术方案](TECHNICAL_SOLUTION.md)
+- [快速开始](QUICKSTART.md)
+
 - [TECHNICAL_GUIDE.md](TECHNICAL_GUIDE.md)
 - [OPERATIONS_GUIDE.md](OPERATIONS_GUIDE.md)
 - [SECURITY.md](SECURITY.md)

@@ -36,10 +36,13 @@
 
 交付文档统一入口：[docs/README.md](docs/README.md)。
 
+- [快速开始](docs/QUICKSTART.md)
 - [使用手册](docs/USER_GUIDE.md)
 - [技术文档](docs/TECHNICAL_GUIDE.md)
+- [技术方案](docs/TECHNICAL_SOLUTION.md)
 - [运维手册](docs/OPERATIONS_GUIDE.md)
 - [架构文档](docs/ARCHITECTURE.md)
+- [架构图集](docs/ARCHITECTURE_DIAGRAMS.md)
 - [性能评估](docs/PERFORMANCE_EVALUATION_2026-11-25.md)
 - [使用建议](docs/RECOMMENDATIONS.md)
 - [交付清单](docs/DELIVERY_CHECKLIST.md)

@@ -16,7 +16,10 @@
 ## 2. 核心交付文档
 
 ```text
+QUICKSTART.md                          快速开始
 USER_GUIDE.md                          使用手册
+TECHNICAL_SOLUTION.md                  技术方案
+ARCHITECTURE_DIAGRAMS.md               架构图集
 TECHNICAL_GUIDE.md                     技术文档
 OPERATIONS_GUIDE.md                    运维手册
 ARCHITECTURE.md                        架构文档

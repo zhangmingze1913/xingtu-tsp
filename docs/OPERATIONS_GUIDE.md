@@ -261,3 +261,65 @@ Argon2 本身耗时；确认使用 release 构建，且没有在 async worker �
 - 百万级当前版本复测
 
 这些必须在目标环境执行，不能用本地 mock 代替。
+
+
+## 13. SLO 与告警建议
+
+| 指标 | 建议阈值 | 说明 |
+| --- | --- | --- |
+| API 5xx 比例 | < 1% / 5min | 数据库/依赖 |
+| `/api/ready` | 连续 3 次失败 | 摘流量 |
+| 登录 p95 | < 1s | Argon2/DB |
+| 车辆列表 p95 | < 300ms | 10K 级 |
+| dashboard 缓存命中 | > 90% | 2s TTL |
+| DB 连接池使用率 | < 80% | 避免打满 |
+| TDengine queue | < 50% | 写入堆积 |
+| TDengine spool | 不持续增长 | 重放失败 |
+| 复制延迟 | < 5s | 只读副本 |
+| 磁盘 | < 80% | WAL/归档/导出 |
+
+告警分级：
+
+```text
+P1  API 全不可用 / 数据库不可写 / 远控异常
+P2  TDengine 持续失败 / 复制延迟 / 归档堆积
+P3  单实例重启 / 导出失败 / 磁盘 70%
+```
+
+## 14. 故障演练清单
+
+```text
+[ ] 停掉一个 API，LB 摘除，剩余实例正常
+[ ] 停掉 Redis，单机降级/集群行为符合预期
+[ ] 停掉 TDengine（dual），spool 增长并可重放
+[ ] 停掉 RustFS，spool 保留并可恢复
+[ ] 主库只读/不可用，应用明确报错
+[ ] 从库延迟，只读查询不冒充强一致
+[ ] 导出任务中断，租约恢复
+[ ] 磁盘满，写入失败但不破坏已有数据
+```
+
+## 15. 部署检查
+
+```text
+[ ] TSP_ENV=production
+[ ] 修改 admin 密码
+[ ] JWT 私钥/公钥持久化
+[ ] JT808 TLS/mTLS
+[ ] Redis TLS/AUTH
+[ ] PostgreSQL/Kingbase 备份
+[ ] 导出密钥/下载密钥
+[ ] Prometheus 抓取
+[ ] 日志集中化
+[ ] 资源 limits/requests
+[ ] PDB/HPA
+[ ] 回滚镜像
+```
+
+## 16. 相关文档
+
+- [QUICKSTART.md](QUICKSTART.md)
+- [TECHNICAL_SOLUTION.md](TECHNICAL_SOLUTION.md)
+- [ARCHITECTURE_DIAGRAMS.md](ARCHITECTURE_DIAGRAMS.md)
+- [POSTGRES_HA.md](POSTGRES_HA.md)
+- [CONTAINER_TESTS.md](CONTAINER_TESTS.md)

@@ -38,6 +38,14 @@ src/
 
 ### 2.1 本次结构优化
 
+TDengine 告警模块已拆出：
+
+```text
+src/tdengine.rs            客户端、写入、查询、统计
+src/tdengine/alert.rs      告警 payload、HMAC 签名、重试、冷却
+```
+
+
 `lib.rs` 原来包含约 450 行后台任务，已迁至：
 
 ```text
@@ -80,7 +88,7 @@ api/integrations.rs
 | `standards/gb32960.rs` | ~3.5k | 编解码与测试集中 | 拆 `codec`/`state`/`tests` |
 | `jt808/control.rs` | ~3.0k | 控制消息集中 | 按 0x8xxx 分组 |
 | `api/integrations/` | mod ~0.5k + export ~0.7k | 已拆出导出任务/令牌/告警 | 可继续拆 `reconcile` |
-| `tdengine.rs` | ~1.0k | 客户端、写入、查询、告警 | 拆 `client`/`writer`/`alert` |
+| `tdengine.rs` + `tdengine/alert.rs` | 823 + 260 | 已拆出告警/冷却/签名；核心写入与查询仍在 | 可继续拆 client/writer/query |
 
 这些是后续可维护性优化项，不影响当前功能。
 
