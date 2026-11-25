@@ -41,6 +41,28 @@ fn key_from_var(name: &str) -> Option<[u8; 32]> {
     key
 }
 
+fn keyring_from_file() -> Option<HashMap<String, [u8; 32]>> {
+    let path = std::env::var("TSP_EXPORT_ENCRYPTION_KEYS_FILE").ok()?;
+    let raw = std::fs::read_to_string(path.trim()).ok()?;
+    let Value::Object(map) = serde_json::from_str::<Value>(&raw).ok()? else {
+        tracing::warn!("export encryption keyring file must be a JSON object");
+        return None;
+    };
+    let mut keys = HashMap::new();
+    for (id, value) in map {
+        if let Some(key) = value.as_str().and_then(decode_key) {
+            keys.insert(id, key);
+        }
+    }
+    Some(keys)
+}
+
+fn key_from_file(name: &str) -> Option<[u8; 32]> {
+    let path = std::env::var(name).ok()?;
+    let raw = std::fs::read_to_string(path.trim()).ok()?;
+    decode_key(&raw)
+}
+
 #[derive(Clone)]
 pub struct KeyRing {
     current_id: String,
@@ -49,12 +71,14 @@ pub struct KeyRing {
 
 impl KeyRing {
     pub fn from_env() -> Option<Self> {
-        let mut keys = HashMap::new();
-        if let Ok(raw) = std::env::var("TSP_EXPORT_ENCRYPTION_KEYS") {
-            if let Ok(Value::Object(map)) = serde_json::from_str::<Value>(&raw) {
-                for (id, value) in map {
-                    if let Some(text) = value.as_str().and_then(decode_key) {
-                        keys.insert(id, text);
+        let mut keys = keyring_from_file().unwrap_or_default();
+        if keys.is_empty() {
+            if let Ok(raw) = std::env::var("TSP_EXPORT_ENCRYPTION_KEYS") {
+                if let Ok(Value::Object(map)) = serde_json::from_str::<Value>(&raw) {
+                    for (id, value) in map {
+                        if let Some(text) = value.as_str().and_then(decode_key) {
+                            keys.insert(id, text);
+                        }
                     }
                 }
             }
@@ -63,10 +87,14 @@ impl KeyRing {
             .ok()
             .filter(|value| !value.trim().is_empty())
             .unwrap_or_else(|| "current".to_string());
-        if let Some(key) = key_from_var("TSP_EXPORT_ENCRYPTION_KEY") {
+        if let Some(key) = key_from_file("TSP_EXPORT_ENCRYPTION_KEY_FILE")
+            .or_else(|| key_from_var("TSP_EXPORT_ENCRYPTION_KEY"))
+        {
             keys.entry(current_id.clone()).or_insert(key);
         }
-        if let Some(key) = key_from_var("TSP_EXPORT_ENCRYPTION_KEY_PREVIOUS") {
+        if let Some(key) = key_from_file("TSP_EXPORT_ENCRYPTION_KEY_PREVIOUS_FILE")
+            .or_else(|| key_from_var("TSP_EXPORT_ENCRYPTION_KEY_PREVIOUS"))
+        {
             keys.entry("previous".to_string()).or_insert(key);
         }
         if keys.is_empty() {
@@ -243,5 +271,40 @@ mod tests {
         std::env::set_var("TSP_EXPORT_REQUIRE_ENCRYPTION", "false");
         assert!(!encryption_required());
         std::env::remove_var("TSP_EXPORT_REQUIRE_ENCRYPTION");
+    }
+
+    #[test]
+    fn keyring_and_single_key_load_from_files() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        clear_env();
+        let dir = std::env::temp_dir().join(format!("tsp-keyring-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).expect("dir");
+        let k1 = base64::engine::general_purpose::STANDARD.encode([1u8; 32]);
+        let k2 = base64::engine::general_purpose::STANDARD.encode([2u8; 32]);
+        let ring_path = dir.join("keys.json");
+        std::fs::write(&ring_path, format!("{{\"k1\":\"{k1}\",\"k2\":\"{k2}\"}}"))
+            .expect("write ring");
+        std::env::set_var("TSP_EXPORT_ENCRYPTION_KEYS_FILE", &ring_path);
+        std::env::set_var("TSP_EXPORT_ENCRYPTION_KEY_ID", "k2");
+        let encrypted = encrypt_with_env(b"file-keyring").expect("encrypt");
+        assert_eq!(
+            decrypt_with_env(&encrypted).expect("decrypt"),
+            b"file-keyring"
+        );
+        clear_env();
+        let single_path = dir.join("key.txt");
+        std::fs::write(
+            &single_path,
+            base64::engine::general_purpose::STANDARD.encode([3u8; 32]),
+        )
+        .expect("write key");
+        std::env::set_var("TSP_EXPORT_ENCRYPTION_KEY_FILE", &single_path);
+        let encrypted = encrypt_with_env(b"single-file").expect("encrypt single");
+        assert_eq!(
+            decrypt_with_env(&encrypted).expect("decrypt single"),
+            b"single-file"
+        );
+        clear_env();
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -426,6 +426,12 @@ TSP_EXPORT_ENCRYPTION_KEYS='{"k2":"<base64>","k1":"<base64>"}'
 TSP_EXPORT_ENCRYPTION_KEY_ID=k2
 ```
 
+- 密钥可从挂载文件读取：
+  - `TSP_EXPORT_ENCRYPTION_KEYS_FILE=/etc/tsp/export-keys/keys.json`
+  - `TSP_EXPORT_ENCRYPTION_KEY_FILE=/etc/tsp/export-keys/key`
+  - `TSP_EXPORT_ENCRYPTION_KEY_PREVIOUS_FILE=...`
+- 文件每次使用时重新读取，可通过 Secret/Vault agent 轮换而无需重启
+- K8s 示例：`deploy/k8s/export-encryption-secret.example.yaml`
 - 解密按文件头 key id 选择密钥；旧格式文件回退尝试已配置密钥
 - 简化轮换：新密钥设 `TSP_EXPORT_ENCRYPTION_KEY`，旧密钥暂设 `TSP_EXPORT_ENCRYPTION_KEY_PREVIOUS`
 - 新文件只用当前密钥；下载先试当前，再回退上一把
