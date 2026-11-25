@@ -111,6 +111,9 @@ services:
       RUSTFS_CONSOLE_ENABLE: "true"
       RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
       RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin}
+      # Local Docker volumes share one physical device; disable the safety
+      # check only for this single-node dev compose.
+      RUSTFS_UNSAFE_BYPASS_DISK_CHECK: ${RUSTFS_UNSAFE_BYPASS_DISK_CHECK:-true}
       RUSTFS_OBS_LOGGER_LEVEL: info
       RUSTFS_OBS_LOG_DIRECTORY: /app/logs
     volumes:

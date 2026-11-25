@@ -4,7 +4,7 @@
 
 - [x] `cargo fmt --check`
 - [x] `cargo clippy --all-targets -- -D warnings`
-- [x] `cargo test --lib`：291 passed
+- [x] `cargo test --lib`：295 passed
 - [x] 集成/协议测试：32 passed
 - [x] `cargo build --release`
 - [x] Git 工作区干净
@@ -40,10 +40,19 @@
 - [ ] spool 重放
 - [ ] 规模压测
 
-### MySQL/SQLite
+### MySQL
+
+- [x] MySQL 8.0 容器启动
+- [x] schema/migrations
+- [x] demo seed
+- [x] 车辆/轨迹/告警 API
+- [x] 重跑幂等索引
+- [x] 环境变量门控测试
+- [ ] MySQL 8.4/5.7 版本矩阵
+
+### SQLite
 
 - [x] 单元/集成测试
-- [ ] 生产 MySQL 版本矩阵
 
 ## 3. 存储与媒体
 

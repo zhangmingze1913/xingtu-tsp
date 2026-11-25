@@ -179,7 +179,3 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at VARCHAR(40) NOT NULL,
     KEY idx_audit_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE INDEX idx_vehicles_org ON vehicles(org_name);
-CREATE INDEX idx_terminals_heartbeat ON terminals(status, last_heartbeat_at);
-CREATE INDEX idx_vehicles_org_plate ON vehicles(org_name, plate_no);

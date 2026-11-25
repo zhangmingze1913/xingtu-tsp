@@ -190,4 +190,22 @@ mod tests {
             .expect("put");
         assert_eq!(put, "PUT events hello");
     }
+
+    #[tokio::test]
+    async fn walrus_container_put_get() {
+        let Ok(addr) = std::env::var("TSP_TEST_WALRUS_ADDR") else {
+            return;
+        };
+        let topic = format!("tsp-test-{}", uuid::Uuid::new_v4().simple());
+        let bus = WalrusBus::connect(&addr, &topic)
+            .await
+            .expect("walrus connect");
+        bus.publish("hello-walrus".to_string());
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let mut stream = TcpStream::connect(&addr).await.expect("get connect");
+        let response = command(&mut stream, &format!("GET {topic}"))
+            .await
+            .expect("get");
+        assert!(response.contains("hello-walrus"), "response: {response}");
+    }
 }

@@ -28,6 +28,7 @@ DELIVERY_CHECKLIST.md                  交付/验收清单
 ## 3. 专题文档
 
 ```text
+CONTAINER_TESTS.md         真实容器验证
 API.md                     HTTP API
 SECURITY.md                安全与密钥
 CLUSTER.md                 集群与 Raft
@@ -58,11 +59,12 @@ STANDARDS_REASSESSMENT_2026-11-21.md
 
 | 项目 | 状态 |
 | --- | --- |
-| 单元/协议测试 | 291 passed |
+| 单元/协议测试 | 295 passed |
 | 集成测试 | 32 passed |
 | fmt / clippy | clean |
 | PostgreSQL 真实连接 | 已验证 |
 | KingbaseES V8R6/V9 关系型 | 已验证（容器） |
+| MySQL 8.0 | 已验证（容器） |
 | KGIS 空间扩展 | 未验证（镜像不含插件） |
 | TDengine | 未验证（无实例） |
 | RustFS | 未验证（无实例） |

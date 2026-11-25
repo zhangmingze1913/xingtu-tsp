@@ -75,7 +75,10 @@ fn rewrites_numbered_placeholders_for_mysql() {
 #[test]
 fn splits_mysql_schema_into_statements() {
     let statements = split_sql_statements(MYSQL_SCHEMA);
-    assert_eq!(statements.len(), 14);
+    // Three org/heartbeat indexes are created by migrations, not the base
+    // schema, so repeated startup does not depend on MySQL's missing
+    // `CREATE INDEX IF NOT EXISTS`.
+    assert_eq!(statements.len(), 11);
     assert!(statements
         .iter()
         .all(|stmt| { stmt.starts_with("CREATE TABLE") || stmt.starts_with("CREATE INDEX") }));
@@ -168,4 +171,14 @@ async fn kingbase_connection_smoke() {
     let db = Db::open(&url).await.expect("KingbaseES connection");
     assert_eq!(db.engine_name(), "kingbase");
     assert!(db.ping().await.is_ok(), "KingbaseES ping");
+}
+
+#[tokio::test]
+async fn mysql_connection_smoke() {
+    let Ok(url) = std::env::var("TSP_TEST_MYSQL_URL") else {
+        return;
+    };
+    let db = Db::open(&url).await.expect("MySQL connection");
+    assert_eq!(db.engine_name(), "mysql");
+    assert!(db.ping().await.is_ok(), "MySQL ping");
 }

@@ -1,12 +1,14 @@
 # syntax=docker/dockerfile:1
 FROM rust:1.94.1-bookworm AS builder
 WORKDIR /build
+ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 RUN apt-get update \
     && apt-get install -y --no-install-recommends pkg-config libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY seed ./seed
+COPY assets ./assets
 RUN cargo build --release
 
 FROM debian:bookworm-slim

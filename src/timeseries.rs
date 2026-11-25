@@ -360,4 +360,16 @@ mod tests {
             .expect_err("must fail");
         assert!(error.to_string().contains("tsink"));
     }
+
+    #[tokio::test]
+    async fn tsink_container_roundtrip() {
+        let Ok(url) = std::env::var("TSP_TEST_TSINK_URL") else {
+            return;
+        };
+        let mut current = sample();
+        current.ts_ms = chrono::Utc::now().timestamp_millis();
+        write_sample(&Client::new(), &url, None, &current)
+            .await
+            .expect("tsink write");
+    }
 }

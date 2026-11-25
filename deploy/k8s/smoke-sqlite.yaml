@@ -1,0 +1,99 @@
+# Minimal single-node SQLite smoke manifest for kind / local Kubernetes.
+#
+# This is NOT a production manifest: it uses one replica, emptyDir storage and
+# demo seed data. It exists to verify scheduling, probes, service discovery and
+# graceful startup on a real Kubernetes API server.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: xingtu-tsp-smoke
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tsp-smoke-config
+  namespace: xingtu-tsp-smoke
+data:
+  TSP_BIND: "0.0.0.0:8090"
+  TSP_JT808_ADDR: "0.0.0.0:18080"
+  TSP_DATABASE: "/data/tsp.db"
+  TSP_DEMO_MODE: "true"
+  TSP_CLUSTER_MODE: "false"
+  # Smoke only: no TLS Secret is mounted, so allow plaintext JT808.
+  TSP_JT808_ALLOW_PLAINTEXT: "true"
+  TSP_POSTGIS_ENABLED: "false"
+  TSP_JWT_SECRET: "k8s-smoke-secret-change-me"
+  TSP_JWT_ACCESS_TTL_MINUTES: "15"
+  TSP_RUSTFS_ARCHIVE: "false"
+  TSP_TIMESERIES_BACKEND: "postgres"
+  RUST_LOG: "xingtu_tsp=info"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tsp-api
+  namespace: xingtu-tsp-smoke
+  labels:
+    app: tsp-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tsp-api
+  template:
+    metadata:
+      labels:
+        app: tsp-api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: api
+          image: xingtu-tsp:k8s
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8090
+          envFrom:
+            - configMapRef:
+                name: tsp-smoke-config
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tsp-api
+  namespace: xingtu-tsp-smoke
+spec:
+  selector:
+    app: tsp-api
+  ports:
+    - name: http
+      port: 8090
+      targetPort: http

@@ -51,6 +51,9 @@ impl IggyBus {
         }
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(10))
+            // Iggy's HTTP listener is h2c-first; HTTP/1.1 requests are closed
+            // without a response by some 0.10 builds.
+            .http2_prior_knowledge()
             .build()
             .map_err(|error| {
                 tracing::error!(%error, "failed to build Iggy HTTP client");
@@ -285,10 +288,14 @@ async fn login(
     })?;
     value
         .get("access_token")
-        .or_else(|| value.get("token"))
-        .and_then(Value::as_str)
+        .and_then(|value| {
+            value
+                .as_str()
+                .or_else(|| value.get("token").and_then(Value::as_str))
+        })
+        .or_else(|| value.get("token").and_then(Value::as_str))
         .map(ToString::to_string)
-        .ok_or_else(|| AppError::internal("Iggy 登录响应缺少 access_token"))
+        .ok_or_else(|| AppError::internal("Iggy login response missing access_token"))
 }
 
 async fn ensure_stream(
@@ -527,5 +534,23 @@ mod tests {
         assert!(seen
             .iter()
             .any(|(kind, value)| kind == "commit" && value == "8"));
+    }
+
+    #[tokio::test]
+    async fn iggy_container_roundtrip() {
+        let Ok(url) = std::env::var("TSP_TEST_IGGY_URL") else {
+            return;
+        };
+        let stream = format!("tsp-test-{}", uuid::Uuid::new_v4().simple());
+        let (bus, mut incoming) =
+            IggyBus::connect(&url, "test-node", &stream, "events", "iggy", "iggy")
+                .await
+                .expect("iggy connect");
+        bus.publish("hello-iggy".to_string());
+        let received = tokio::time::timeout(Duration::from_secs(10), incoming.recv())
+            .await
+            .expect("timeout")
+            .expect("message");
+        assert_eq!(received, "hello-iggy");
     }
 }

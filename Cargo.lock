@@ -390,7 +390,7 @@ dependencies = [
  "http 0.2.12",
  "http-body 0.4.6",
  "hyper 0.14.32",
- "hyper-rustls",
+ "hyper-rustls 0.24.2",
  "pin-project-lite",
  "rustls 0.21.12",
  "rustls-native-certs",
@@ -1815,7 +1815,9 @@ checksum = "2c3e324da4c95177d6291d4c8730197c0d1822f8a9766814a4a44fa5ab797c9c"
 dependencies = [
  "atomic-waker",
  "bytes",
+ "futures-channel",
  "futures-core",
+ "h2 0.4.20",
  "http 1.5.0",
  "http-body 1.1.0",
  "httparse",
@@ -1840,6 +1842,21 @@ dependencies = [
  "rustls 0.21.12",
  "tokio",
  "tokio-rustls 0.24.1",
+]
+
+[[package]]
+name = "hyper-rustls"
+version = "0.27.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dfa8e654703247911e29c23fbeaa261834bd9bb74efba2f9acddc37bfb127f53"
+dependencies = [
+ "http 1.5.0",
+ "hyper 1.12.0",
+ "hyper-util",
+ "rustls 0.23.46",
+ "tokio",
+ "tokio-rustls 0.26.6",
+ "tower-service",
 ]
 
 [[package]]
@@ -2991,10 +3008,12 @@ dependencies = [
  "futures-channel",
  "futures-core",
  "futures-util",
+ "h2 0.4.20",
  "http 1.5.0",
  "http-body 1.1.0",
  "http-body-util",
  "hyper 1.12.0",
+ "hyper-rustls 0.27.10",
  "hyper-tls",
  "hyper-util",
  "js-sys",

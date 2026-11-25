@@ -259,7 +259,7 @@ cargo test --test auth --test vehicles --test standards --test storage --test cl
 当前基线：
 
 ```text
-lib 291 passed
+lib 295 passed
 integration 32 passed
 fmt clean
 clippy --all-targets clean
@@ -284,6 +284,16 @@ Redis 真实测试：
 ```bash
 docker run -d --name tsp-test-redis -p 56379:6379 redis:7-alpine
 TSP_TEST_REDIS_URL=redis://127.0.0.1:56379/8 cargo test --lib redis_session_roundtrip
+```
+
+MySQL 容器测试：
+
+```bash
+docker run -d --name tsp-mysql -e MYSQL_ROOT_PASSWORD=root \
+  -e MYSQL_DATABASE=tsp -e MYSQL_USER=tsp -e MYSQL_PASSWORD=tsp-dev-password \
+  -p 33060:3306 mysql:8.0
+TSP_TEST_MYSQL_URL='mysql://tsp:tsp-dev-password@127.0.0.1:33060/tsp' \
+  cargo test --lib mysql_connection_smoke
 ```
 
 Kingbase 真实测试：

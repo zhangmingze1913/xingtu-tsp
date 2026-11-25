@@ -30,7 +30,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 futures-util = "0.3"
 redis = { version = "0.32", features = ["tokio-comp", "connection-manager", "tokio-native-tls-comp"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls", "blocking"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls", "blocking", "http2"] }
 base64 = "0.22"
 encoding_rs = "0.8"
 crc32fast = "1"
