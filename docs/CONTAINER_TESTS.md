@@ -9,6 +9,7 @@
 | PostgreSQL | `postgis/postgis:16-3.4` | 通过 | schema/migrations/seed/车辆/告警 |
 | PostGIS | `postgis/postgis:16-3.4` | 通过 | 3.4、geometry、GiST/geography、nearby/bbox |
 | PostgreSQL HA | `postgres:16` x2 | 通过 | 流复制、只读从库、手工 promote |
+| Patroni HA | `ongres/patroni` + etcd | 通过 | 3 节点自动升主（pg1→pg3）|
 | MySQL | `mysql:8.0` | 通过 | schema/migrations/seed/车辆/告警 |
 | RustFS | `rustfs/rustfs:latest` | 通过 | 建桶、上传、head-object |
 | TDengine | `tdengine/tdengine:3.3.6.0` | 通过 | REST smoke + API trajectory source=tdengine |
@@ -17,7 +18,7 @@
 | Redis | `redis:7-alpine` | 通过 | 真实 session SET/GET |
 | Walrus | 源码构建 `tsp-walrus:dev` | 通过 | 单节点 + 双节点 PUT/GET |
 | tsink | 源码构建 `tsp-tsink:dev` | 通过 | 真实 `/api/v1/import/prometheus` 写入 |
-| Kubernetes | kind v0.33.0 | 通过 | Deployment 1/1 Running，健康检查、登录、车辆 API |
+| Kubernetes | k3d v5.8.3 | 通过 | PG+RustFS+TLS+API，1/1 Running，重启数据保留 |
 
 ## 2. PostgreSQL + PostGIS
 
@@ -277,42 +278,45 @@ tsink_container_roundtrip ... ok
 - `sample()` 的 2023 时间戳会被默认保留窗口拒绝（422 `write_out_of_retention`）；真实测试使用当前时间。
 - 端点 `/api/v1/import/prometheus` 要求 label 值带引号。
 
-## 10. Kubernetes（kind）
+## 10. Kubernetes 完整链路（k3d）
 
 ```bash
-kind create cluster --name tsp-test
-kubectl kustomize deploy/k8s >/dev/null   # 清单构建通过
-
-docker build -t xingtu-tsp:k8s .
-kind load docker-image xingtu-tsp:k8s --name tsp-test
-kubectl apply -f deploy/k8s/smoke-sqlite.yaml
-kubectl -n xingtu-tsp-smoke rollout status deploy/tsp-api
-kubectl -n xingtu-tsp-smoke port-forward svc/tsp-api 18090:8090
+k3d cluster create tsp --servers 1 --agents 0 \
+  --k3s-arg '--disable=traefik@server:0' --wait
+k3d image import xingtu-tsp:k8s -c tsp
+# 创建 namespace/secret，apply configmap/postgres/redis/rustfs/api
+# 单节点 smoke 配置：cluster=false, postgis=false, api replicas=1
 ```
 
 实测：
 
 ```text
-pod 1/1 Running，RESTARTS=0
-deployment 1/1 available
-/api/health database_engine=sqlite, database=true
-login admin/admin123 成功
-vehicles 5 / total 18
+k3d v5.8.3 / k3s v1.31.5
+postgres-0 1/1 Running
+redis      1/1 Running
+rustfs     1/1 Running
+tsp-api    1/1 Running
+database_engine=postgres
+vehicles total=18
+JT808 TLS enabled
+RustFS media archive enabled
+archive prefix media/12345678901/1/
+删除 API Pod 后重建：vehicles 仍为 18
 ```
 
-这验证了 namespace/configmap、Deployment、Service、readiness/liveness、emptyDir、runAsUser 10001。
+kind v0.33.0 在同一环境反复失败：
 
-Docker 构建修复：
+```text
+kubeadm wait-control-plane
+client rate limiter Wait ... context deadline
+```
 
-- Dockerfile 增加 `COPY assets ./assets`；否则 `include_bytes!` 找不到 sample.h264/aac。
-- 增加 `CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse`，避免容器内 crates.io index 卡住。
-
-完整清单仍使用 PostgreSQL/Redis/RustFS 与 TLS Secret；生产不要用 smoke 清单。
+因此改用 k3d；完整步骤见 [KUBERNETES_SMOKE.md](KUBERNETES_SMOKE.md)。
 
 ## 11. 结论
 
-已从 mock 推进到真实容器的组件：MySQL、RustFS、TDengine、Vault、Iggy、Redis、Walrus、tsink，以及 Kubernetes smoke。
+已从 mock 推进到真实容器的组件：MySQL、RustFS、TDengine、Vault、Iggy、Redis、Walrus（双节点）、tsink，以及 Kubernetes 完整链路（k3d）。
 
-仍未完成：真实多节点 Iggy/Walrus/tsink 集群、RustFS/TDengine 生产集群、K8s 完整 PostgreSQL/Redis/RustFS/TLS 清单。
+仍未完成：多节点 Iggy/tsink、RustFS/TDengine 生产集群、K8s 多副本/托管/Ingress TLS。
 
 不要把 smoke 写成生产验证；上表是当前唯一口径。

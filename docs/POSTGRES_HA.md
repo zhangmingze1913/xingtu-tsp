@@ -105,3 +105,79 @@ promoted INSERT = ok
 ```
 
 未完成项不得用本 smoke 结果替代。
+
+
+## 7. Patroni 自动 failover
+
+手工 promote 之外，已用 etcd + 3 x Patroni/PostgreSQL 验证自动 failover。
+
+镜像：
+
+```text
+ongres/patroni:latest   (Patroni 4.0.4, PostgreSQL 17.2)
+quay.io/coreos/etcd:v3.5.17
+```
+
+拓扑：
+
+```text
+etcd
+pg1 :55441 -> rest :8008
+pg2 :55442 -> rest :8009
+pg3 :55443 -> rest :8010
+```
+
+关键配置：
+
+```yaml
+scope: tsp
+restapi:
+  listen: 0.0.0.0:8008
+  connect_address: pg1:8008
+etcd3:
+  hosts: etcd:2379
+bootstrap:
+  dcs:
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    postgresql:
+      use_pg_rewind: true
+      parameters:
+        wal_level: replica
+        hot_standby: "on"
+        max_wal_senders: 10
+  initdb:
+    - encoding: UTF8
+    - data-checksums
+  pg_hba:
+    - host all all 0.0.0.0/0 md5
+    - host replication replicator 0.0.0.0/0 md5
+postgresql:
+  listen: 0.0.0.0:5432
+  connect_address: pg1:5432
+  data_dir: /data/pgdata
+  bin_dir: /usr/lib/postgresql/17.2/bin
+  authentication:
+    superuser: {username: postgres, password: postgres}
+    replication: {username: replicator, password: replicator}
+  parameters:
+    unix_socket_directories: /tmp
+```
+
+实测：
+
+```text
+pg1 Leader / pg2 Replica streaming / pg3 Replica streaming
+stop pg1
+pg3 Leader (TL 2)
+INSERT failover_probe -> 1 row
+pg2 pg_is_in_recovery = t
+```
+
+注意：
+
+- 这是开发机单 etcd smoke；生产 etcd 必须 3/5 节点。
+- 需要客户端 VIP/DNS/连接串切换。
+- 需要 RPO/RTO、多 AZ、网络分区、脑裂演练。
+- 应用迁移只连 leader。

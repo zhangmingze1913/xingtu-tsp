@@ -14,14 +14,13 @@ GitHub 提交：符合
 已通过：
 
 - 代码测试、真实容器单节点验证
-- PostgreSQL 主从流复制与手工 promote
+- PostgreSQL 主从流复制、手工 promote、Patroni 自动 failover
 - PostGIS 10 万/100 万空间基准
-- K8s SQLite smoke
+- K8s SQLite smoke + k3d 完整链路
 
 未通过：
 
-- K8s 多副本/托管/生产网络（单节点 k3d 已通过）
-- PostgreSQL 自动 failover
+- K8s 多副本/托管/生产网络
 - KGIS
 - 多节点 Iggy/tsink（Walrus 双节点已通过）
 - 真实终端/弱网
@@ -35,7 +34,7 @@ GitHub 提交：符合
 | PostgreSQL 16 | 通过 | 真实容器 |
 | PostGIS 3.4 | 通过 | geometry/GiST/bbox |
 | PostgreSQL 主从 | 通过（手工） | streaming/async/lag0/promote |
-| PostgreSQL 自动 failover | 未通过 | 需 Patroni/云 RDS |
+| PostgreSQL 自动 failover | 通过（Patroni） | 3 节点，pg1 停止后 pg3 自动升主并写入 |
 | MySQL 8 | 通过 | 容器 + API |
 | KingbaseES 关系型 | 通过 | V8R6/V9 容器 |
 | KGIS | 未通过 | 镜像无插件/授权 |
@@ -97,7 +96,27 @@ client rate limiter Wait ... context deadline
 
 已尝试清理/重建/`--retain`/释放资源；判断为当前 Docker Desktop/WSL 的 kind 控制面初始化问题。k3d 已完成同一清单的应用层验证。
 
-### 3.2 Walrus 双节点
+### 3.2 Patroni 自动 failover
+
+目标：
+
+```text
+etcd + 3 x Patroni/PostgreSQL 16
+```
+
+结果：**通过**
+
+```text
+pg1 Leader / pg2 Replica streaming / pg3 Replica streaming
+stop pg1
+pg3 Leader (TL 2)
+INSERT failover_probe -> 1 row
+pg2 pg_is_in_recovery = t
+```
+
+配置与步骤见 [POSTGRES_HA.md](POSTGRES_HA.md)。
+
+### 3.3 Walrus 双节点
 
 目标：
 
@@ -122,7 +141,8 @@ node2 GET OK hello-cluster
 
 ```text
 [ ] 目标环境压测：10K/100K/1M，含并发/长稳
-[ ] 数据库自动 failover 演练，RPO/RTO 达标
+[x] Patroni 自动 failover 原语（单环境 smoke）
+[ ] RPO/RTO/多 AZ/客户端切换演练
 [x] K8s 单节点 PG/Redis/RustFS/TLS 完整链路（k3d）
 [ ] K8s 多副本/托管 PG/Redis、Ingress TLS、滚动升级/回滚
 [ ] KGIS 真实扩展与空间查询
