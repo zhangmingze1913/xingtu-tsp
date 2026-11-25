@@ -1,5 +1,7 @@
 # 交付验收清单
 
+> 生产就绪状态与退出标准见 [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)。
+
 ## 1. 代码与构建
 
 - [x] `cargo fmt --check`
@@ -109,6 +111,7 @@
 
 ## 6. 部署
 
+- [x] k3d 完整链路（PG+RustFS+TLS）
 - [x] 单机 Compose
 - [x] 集群 Compose
 - [x] K8s 清单

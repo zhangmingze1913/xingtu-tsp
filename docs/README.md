@@ -26,12 +26,14 @@ ARCHITECTURE.md                        架构文档
 PERFORMANCE_EVALUATION_2026-11-25.md   本次性能评估
 RECOMMENDATIONS.md                     选型与使用建议
 DELIVERY_CHECKLIST.md                  交付/验收清单
+PRODUCTION_READINESS.md                生产就绪评估/退出计划
 ```
 
 ## 3. 专题文档
 
 ```text
 CONTAINER_TESTS.md         真实容器验证
+KUBERNETES_SMOKE.md        K8s 完整链路 smoke
 API.md                     HTTP API
 SECURITY.md                安全与密钥
 CLUSTER.md                 集群与 Raft

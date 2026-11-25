@@ -46,6 +46,7 @@
 - [性能评估](docs/PERFORMANCE_EVALUATION_2026-11-25.md)
 - [使用建议](docs/RECOMMENDATIONS.md)
 - [交付清单](docs/DELIVERY_CHECKLIST.md)
+- [生产就绪评估](docs/PRODUCTION_READINESS.md)
 
 ## 2. 快速启动
 

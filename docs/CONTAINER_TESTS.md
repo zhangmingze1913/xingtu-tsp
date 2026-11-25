@@ -15,7 +15,7 @@
 | Vault | `hashicorp/vault:latest` | 通过 | dev server + KV v2 同步密钥文件 |
 | Iggy | `apache/iggy:latest` | 通过 | HTTP/2 login/stream/topic/publish/poll |
 | Redis | `redis:7-alpine` | 通过 | 真实 session SET/GET |
-| Walrus | 源码构建 `tsp-walrus:dev` | 通过 | 真实 REGISTER/PUT/GET |
+| Walrus | 源码构建 `tsp-walrus:dev` | 通过 | 单节点 + 双节点 PUT/GET |
 | tsink | 源码构建 `tsp-tsink:dev` | 通过 | 真实 `/api/v1/import/prometheus` 写入 |
 | Kubernetes | kind v0.33.0 | 通过 | Deployment 1/1 Running，健康检查、登录、车辆 API |
 
@@ -243,6 +243,10 @@ docker run -d --name tsp-walrus --security-opt seccomp=unconfined \
 ```text
 TSP_TEST_WALRUS_ADDR=127.0.0.1:9091
 walrus_container_put_get ... ok
+
+双节点：
+node1 REGISTER OK / PUT OK
+node2 REGISTER OK / GET hello-cluster
 ```
 
 ## 9. tsink
