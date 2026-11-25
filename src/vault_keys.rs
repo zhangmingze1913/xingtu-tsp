@@ -14,6 +14,8 @@ use crate::error::{AppError, AppResult};
 
 pub static VAULT_SYNC_OK: AtomicU64 = AtomicU64::new(0);
 pub static VAULT_SYNC_FAILED: AtomicU64 = AtomicU64::new(0);
+pub static VAULT_LOGIN_OK: AtomicU64 = AtomicU64::new(0);
+pub static VAULT_LOGIN_FAILED: AtomicU64 = AtomicU64::new(0);
 
 pub fn token_from_env() -> Option<String> {
     if let Ok(token) = std::env::var("TSP_VAULT_TOKEN") {
@@ -26,6 +28,87 @@ pub fn token_from_env() -> Option<String> {
         .ok()
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
+}
+
+fn secret_id_from_env() -> Option<String> {
+    if let Ok(secret) = std::env::var("TSP_VAULT_SECRET_ID") {
+        if !secret.trim().is_empty() {
+            return Some(secret.trim().to_string());
+        }
+    }
+    let path = std::env::var("TSP_VAULT_SECRET_ID_FILE").ok()?;
+    std::fs::read_to_string(path.trim())
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+pub async fn login_approle(
+    addr: &str,
+    role_id: &str,
+    secret_id: &str,
+    namespace: Option<&str>,
+) -> AppResult<String> {
+    let base = addr.trim_end_matches('/');
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|error| AppError::internal(format!("vault client: {error}")))?;
+    let mut request = client
+        .post(format!("{base}/v1/auth/approle/login"))
+        .json(&serde_json::json!({"role_id": role_id, "secret_id": secret_id}));
+    if let Some(namespace) = namespace.filter(|value| !value.trim().is_empty()) {
+        request = request.header("X-Vault-Namespace", namespace);
+    }
+    let response = request
+        .send()
+        .await
+        .map_err(|error| AppError::internal(format!("vault login: {error}")))?;
+    if !response.status().is_success() {
+        return Err(AppError::internal(format!(
+            "vault login HTTP {}",
+            response.status()
+        )));
+    }
+    let value: Value = response
+        .json()
+        .await
+        .map_err(|error| AppError::internal(format!("vault login json: {error}")))?;
+    value
+        .get("auth")
+        .and_then(|value| value.get("client_token"))
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .ok_or_else(|| AppError::internal("vault login missing client_token"))
+}
+
+/// Resolve a Vault token from the environment, a token file, or AppRole.
+pub async fn resolve_token(addr: &str, namespace: Option<&str>) -> AppResult<String> {
+    if let Some(token) = token_from_env() {
+        return Ok(token);
+    }
+    let role_id = std::env::var("TSP_VAULT_ROLE_ID")
+        .ok()
+        .filter(|value| !value.trim().is_empty());
+    let secret_id = secret_id_from_env();
+    match (role_id, secret_id) {
+        (Some(role_id), Some(secret_id)) => {
+            match login_approle(addr, role_id.trim(), &secret_id, namespace).await {
+                Ok(token) => {
+                    VAULT_LOGIN_OK.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    Ok(token)
+                }
+                Err(error) => {
+                    VAULT_LOGIN_FAILED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    Err(error)
+                }
+            }
+        }
+        _ => Err(AppError::internal(
+            "no Vault token or AppRole credentials configured",
+        )),
+    }
 }
 
 pub async fn sync_once(
@@ -176,5 +259,55 @@ mod tests {
         )
         .await
         .is_err());
+    }
+
+    #[tokio::test]
+    async fn approle_login_and_secret_fetch() {
+        use axum::{
+            http::HeaderMap,
+            routing::{get, post},
+            Json, Router,
+        };
+
+        async fn login() -> Json<Value> {
+            serde_json::json!({"auth": {"client_token": "approle-token"}}).into()
+        }
+        async fn secret(headers: HeaderMap) -> Json<Value> {
+            assert_eq!(
+                headers.get("x-vault-token").and_then(|v| v.to_str().ok()),
+                Some("approle-token")
+            );
+            serde_json::json!({
+                "data": {"data": {"k1": base64::engine::general_purpose::STANDARD.encode([2u8; 32])}}
+            })
+            .into()
+        }
+        let app = Router::new()
+            .route("/v1/auth/approle/login", post(login))
+            .route("/v1/secret/data/export", get(secret));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        let token = login_approle(&format!("http://{addr}"), "role", "secret", None)
+            .await
+            .expect("login");
+        assert_eq!(token, "approle-token");
+        let dir = std::env::temp_dir().join(format!("tsp-vault-{}", uuid::Uuid::new_v4()));
+        let path = dir.join("keys.json");
+        sync_once(
+            &format!("http://{addr}"),
+            &token,
+            "secret/data/export",
+            None,
+            &path,
+        )
+        .await
+        .expect("sync");
+        assert!(path.exists());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

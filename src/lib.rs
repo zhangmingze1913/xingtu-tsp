@@ -225,10 +225,11 @@ fn spawn_vault_key_sync() {
     let Ok(path) = std::env::var("TSP_VAULT_SECRET_PATH") else {
         return;
     };
-    let Some(token) = crate::vault_keys::token_from_env() else {
-        tracing::warn!("TSP_VAULT_ADDR set but no Vault token; key sync disabled");
+    if crate::vault_keys::token_from_env().is_none() && std::env::var("TSP_VAULT_ROLE_ID").is_err()
+    {
+        tracing::warn!("TSP_VAULT_ADDR set but no Vault token/AppRole; key sync disabled");
         return;
-    };
+    }
     let Ok(target) = std::env::var("TSP_EXPORT_ENCRYPTION_KEYS_FILE") else {
         tracing::warn!("Vault key sync requires TSP_EXPORT_ENCRYPTION_KEYS_FILE");
         return;
@@ -244,6 +245,15 @@ fn spawn_vault_key_sync() {
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             ticker.tick().await;
+            let token = match crate::vault_keys::resolve_token(&addr, namespace.as_deref()).await {
+                Ok(token) => token,
+                Err(error) => {
+                    crate::vault_keys::VAULT_LOGIN_FAILED
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    tracing::warn!(%error, "vault token resolve failed");
+                    continue;
+                }
+            };
             match crate::vault_keys::sync_once(
                 &addr,
                 &token,

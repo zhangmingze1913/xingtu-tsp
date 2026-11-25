@@ -448,7 +448,15 @@ TSP_VAULT_SYNC_SECS=300
 ```
 
 - 每 300s 拉取 `data.data`，校验 32 字节 base64，原子写 keys 文件
-- 指标：`xingtu_vault_sync_ok_total`、`failed_total`
+- 支持 AppRole：
+
+```bash
+TSP_VAULT_ROLE_ID=...
+TSP_VAULT_SECRET_ID_FILE=/var/run/secrets/vault-secret-id
+```
+
+- 每个同步周期重新登录获取 client_token
+- 指标：`xingtu_vault_sync_ok_total`、`failed_total`、`login_ok_total`、`login_failed_total`
 - Unix 下密钥文件必须仅 owner 可读写：`chmod 600`；group/world 可读会被拒绝
 - K8s Secret volume 设置 `defaultMode: 0400`
 - K8s 示例：`deploy/k8s/export-encryption-secret.example.yaml`
