@@ -246,6 +246,43 @@ impl Db {
         Ok(())
     }
 
+    pub async fn try_claim_export_alert(
+        &self,
+        job_id: &str,
+        now: &str,
+        cutoff: &str,
+    ) -> AppResult<bool> {
+        let updated = self
+            .query(
+                "UPDATE export_alert_state SET last_sent_at = ?1
+                 WHERE job_id = ?2 AND last_sent_at <= ?3",
+            )
+            .bind(now)
+            .bind(job_id)
+            .bind(cutoff)
+            .execute(self.pool())
+            .await?;
+        if updated.rows_affected() > 0 {
+            return Ok(true);
+        }
+        let inserted = self
+            .query("INSERT INTO export_alert_state (job_id, last_sent_at) VALUES (?1, ?2)")
+            .bind(job_id)
+            .bind(now)
+            .execute(self.pool())
+            .await;
+        Ok(inserted.is_ok())
+    }
+
+    pub async fn prune_export_alert_state(&self, cutoff: &str) -> AppResult<u64> {
+        let result = self
+            .query("DELETE FROM export_alert_state WHERE last_sent_at < ?1")
+            .bind(cutoff)
+            .execute(self.pool())
+            .await?;
+        Ok(result.rows_affected())
+    }
+
     pub async fn create_export_download_token(
         &self,
         jti: &str,
@@ -680,5 +717,22 @@ mod tests {
             .consume_export_download_token("jti-1", "2026-11-24T00:00:00Z")
             .await
             .expect("replay"));
+    }
+
+    #[tokio::test]
+    async fn export_alert_claim_is_cross_instance_safe() {
+        let db = Db::in_memory().await.expect("db");
+        assert!(db
+            .try_claim_export_alert("job-1", "2026-11-24T00:05:00Z", "2026-11-24T00:00:00Z")
+            .await
+            .expect("first"));
+        assert!(!db
+            .try_claim_export_alert("job-1", "2026-11-24T00:06:00Z", "2026-11-24T00:01:00Z")
+            .await
+            .expect("within"));
+        assert!(db
+            .try_claim_export_alert("job-1", "2026-11-24T00:11:00Z", "2026-11-24T00:06:00Z")
+            .await
+            .expect("after"));
     }
 }

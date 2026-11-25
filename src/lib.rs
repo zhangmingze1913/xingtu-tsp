@@ -281,6 +281,11 @@ fn spawn_reconciliation_export_cleanup(state: AppState) {
                     let _ = tokio::fs::remove_file(format!("{dir}/{id}{suffix}")).await;
                 }
             }
+            if let Ok(pruned) = state.db.prune_export_alert_state(&cutoff).await {
+                if pruned > 0 {
+                    tracing::info!(pruned, "pruned export alert state");
+                }
+            }
             tracing::info!(jobs = ids.len(), hours, "pruned reconciliation export jobs");
         }
     });

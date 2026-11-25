@@ -261,6 +261,14 @@ impl Db {
              ON export_download_tokens(job_id)",
         )
         .await?;
+        self.apply_migration(
+            "0030_export_alert_state",
+            "CREATE TABLE IF NOT EXISTS export_alert_state (
+                 job_id VARCHAR(64) PRIMARY KEY,
+                 last_sent_at VARCHAR(40) NOT NULL
+             )",
+        )
+        .await?;
         Ok(())
     }
 

@@ -307,6 +307,7 @@ GET /api/integrations/timeseries/reconciliations/export/page?limit=500&cursor=<c
 - 指标：`xingtu_tdengine_alert_sent_total`、`failed_total`、`skipped_total`
 - 导出任务失败复用同一 webhook，`type=reconciliation_export_failed`
 - 同一 job 默认 300s 冷却：`TSP_EXPORT_ALERT_COOLDOWN_SECS`
+- 冷却状态存 `export_alert_state`，多实例共享，跨实例只发一次
 - 指标：`xingtu_reconcile_export_alerts_skipped_total`
 - 指标：`xingtu_reconcile_export_alerts_sent_total`、`failed_total`
 - 指标：`xingtu_tdengine_reconcile_checks_total`、`xingtu_tdengine_reconcile_mismatches_total`
