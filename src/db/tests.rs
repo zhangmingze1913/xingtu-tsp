@@ -136,3 +136,26 @@ async fn mysql_placeholder_expansion_when_configured() {
     assert_eq!(row.try_get::<String, _>(2).unwrap(), "same");
     tx.rollback().await.expect("rollback");
 }
+
+#[test]
+fn normalizes_kingbase_urls_to_postgres_wire() {
+    assert_eq!(
+        kingbase_url_from("kingbase://tsp:pw@kes:54321/tsp?sslmode=disable"),
+        "postgres://tsp:pw@kes:54321/tsp?sslmode=disable"
+    );
+    assert_eq!(
+        kingbase_url_from("kingbase8://kes/tsp"),
+        "postgres://kes/tsp"
+    );
+    assert_eq!(
+        kingbase_url_from("kingbasees://kes:54321/tsp"),
+        "postgres://kes:54321/tsp"
+    );
+}
+
+#[tokio::test]
+async fn sqlite_engine_name_is_sqlite() {
+    let db = Db::in_memory().await.expect("db");
+    assert_eq!(db.engine_name(), "sqlite");
+    assert!(!db.is_kingbase());
+}

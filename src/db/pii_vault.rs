@@ -14,9 +14,15 @@ impl Db {
     /// server default.
     async fn relax_audit_commit(&self, tx: &mut sqlx::Transaction<'_, sqlx::Any>) -> AppResult<()> {
         if self.backend == crate::db::Backend::Postgres {
-            sqlx::query("SET LOCAL synchronous_commit = off")
+            if let Err(error) = sqlx::query("SET LOCAL synchronous_commit = off")
                 .execute(&mut **tx)
-                .await?;
+                .await
+            {
+                if !self.is_kingbase() {
+                    return Err(error.into());
+                }
+                tracing::warn!(%error, "Kingbase synchronous_commit setting unavailable");
+            }
         }
         Ok(())
     }

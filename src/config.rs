@@ -294,13 +294,17 @@ impl Config {
     }
 
     /// True when [`Config::database_url`] selects MySQL / MariaDB.
+    pub fn is_kingbase(&self) -> bool {
+        is_kingbase_url(&self.database_url)
+    }
+
     pub fn is_mysql(&self) -> bool {
         is_mysql_url(&self.database_url)
     }
 }
 
 /// PostgreSQL URLs are used verbatim; everything else is a SQLite file path
-/// unless it is a MySQL/MariaDB URL.
+/// unless it is a MySQL/MariaDB or KingbaseES URL.
 fn env_file(name: &str) -> Option<String> {
     let path = env::var(name).ok().filter(|value| !value.is_empty())?;
     match std::fs::read_to_string(&path) {
@@ -312,8 +316,16 @@ fn env_file(name: &str) -> Option<String> {
     }
 }
 
+pub fn is_kingbase_url(database_url: &str) -> bool {
+    database_url.starts_with("kingbase://")
+        || database_url.starts_with("kingbase8://")
+        || database_url.starts_with("kingbasees://")
+}
+
 pub fn is_postgres_url(database_url: &str) -> bool {
-    database_url.starts_with("postgres://") || database_url.starts_with("postgresql://")
+    database_url.starts_with("postgres://")
+        || database_url.starts_with("postgresql://")
+        || is_kingbase_url(database_url)
 }
 
 /// MySQL-compatible URLs are `mysql://` or `mariadb://`.
@@ -361,6 +373,10 @@ mod tests {
         assert!(!is_postgres_url("data/tsp.db"));
         assert!(!is_postgres_url("sqlite://data/tsp.db"));
         assert!(!is_postgres_url("mysql://user:pw@db:3306/tsp"));
+        assert!(is_postgres_url("kingbase://user:pw@db:54321/tsp"));
+        assert!(is_postgres_url("kingbase8://db:54321/tsp"));
+        assert!(is_kingbase_url("kingbasees://db/tsp"));
+        assert!(!is_kingbase_url("postgres://db/tsp"));
 
         assert!(is_mysql_url("mysql://user:pw@db:3306/tsp"));
         assert!(is_mysql_url("mariadb://db/tsp"));
@@ -384,6 +400,7 @@ mod tests {
             sqlite_path_from("mariadb://user:pw@db:3306/tsp"),
             PathBuf::new()
         );
+        assert_eq!(sqlite_path_from("kingbase://db:54321/tsp"), PathBuf::new());
     }
 
     #[test]

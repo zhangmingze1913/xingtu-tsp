@@ -25,10 +25,17 @@ impl Db {
                 // Concurrent replicas must not race on CREATE TABLE. Take a
                 // transaction-scoped advisory lock so DDL is serialized.
                 let mut tx = self.pool.begin().await?;
-                sqlx::query("SELECT pg_advisory_xact_lock($1)")
+                if let Err(error) = sqlx::query("SELECT pg_advisory_xact_lock($1)")
                     .bind(SCHEMA_LOCK_ID)
                     .execute(&mut *tx)
-                    .await?;
+                    .await
+                {
+                    if self.kingbase {
+                        tracing::warn!(%error, "Kingbase advisory lock unavailable; continuing DDL without it");
+                    } else {
+                        return Err(error.into());
+                    }
+                }
                 sqlx::raw_sql(schema).execute(&mut *tx).await?;
                 tx.commit().await?;
             }
@@ -275,10 +282,17 @@ impl Db {
     async fn ensure_migration_table(&self) -> AppResult<()> {
         if self.backend == Backend::Postgres {
             let mut tx = self.pool.begin().await?;
-            sqlx::query("SELECT pg_advisory_xact_lock($1)")
+            if let Err(error) = sqlx::query("SELECT pg_advisory_xact_lock($1)")
                 .bind(SCHEMA_LOCK_ID)
                 .execute(&mut *tx)
-                .await?;
+                .await
+            {
+                if self.kingbase {
+                    tracing::warn!(%error, "Kingbase advisory lock unavailable; continuing migration table DDL");
+                } else {
+                    return Err(error.into());
+                }
+            }
             sqlx::query(
                 "CREATE TABLE IF NOT EXISTS schema_migrations (
                      version TEXT PRIMARY KEY,

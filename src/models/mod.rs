@@ -453,6 +453,7 @@ pub struct HealthResponse {
     pub status: &'static str,
     pub version: &'static str,
     pub database: bool,
+    pub database_engine: String,
     pub cluster_enabled: bool,
     pub cluster_leader: bool,
     pub timeseries_backend: String,

@@ -406,3 +406,10 @@ K8s Deployment/StatefulSet + PDB/NetworkPolicy
 ---
 
 附：容量数据见 [BENCHMARK_REPORT.md](BENCHMARK_REPORT.md)，代码结构见 [STRUCTURE.md](STRUCTURE.md)，PostGIS 见 [POSTGIS.md](POSTGIS.md)。
+
+
+## 信创数据库
+
+- KingbaseES V8R6/V9 + KGIS 作为 PostgreSQL/PostGIS 替代
+- URL：`kingbase://user:pass@host:54321/db`
+- 详见 [KINGBASE_KGIS.md](KINGBASE_KGIS.md)

@@ -2,7 +2,7 @@
 
 面向车联网 TSP（Telematics Service Provider）场景的可运行运营平台：统一接入车辆、T-Box、位置与告警数据，提供实时监控、电子围栏、行程分析、远程车控和运营看板。
 
-后端使用 **Rust + Axum + Tokio + SQLx**，数据库支持 **SQLite（单机）/ PostgreSQL / MySQL（集群或单机）**，实时总线支持**进程内 broadcast / Redis Pub/Sub / Apache Iggy**，并可选接入 **tsink 时序库** 与 **Walrus 分布式日志**；前端为**零依赖、可离线运行**的运营控制台。平台同时内置 **JT/T 808-2019 子集 TCP 网关** 与终端模拟器，形成从终端接入到业务闭环的完整链路。
+后端使用 **Rust + Axum + Tokio + SQLx**，数据库支持 **SQLite（单机）/ PostgreSQL / MySQL / KingbaseES（KGIS，信创）**，实时总线支持**进程内 broadcast / Redis Pub/Sub / Apache Iggy**，并可选接入 **tsink 时序库** 与 **Walrus 分布式日志**；前端为**零依赖、可离线运行**的运营控制台。平台同时内置 **JT/T 808-2019 子集 TCP 网关** 与终端模拟器，形成从终端接入到业务闭环的完整链路。
 
 ![运营总览](docs/screenshots/dashboard.png)
 
@@ -27,7 +27,7 @@
 | 消息流 | 可选 Apache Iggy HTTP 事件日志、Walrus 持久事件归档 |
 | 标准接入 | JT/T 809 / GB/T 32960 传输帧骨架、能力端点；业务消息体未实现 |
 | 时序库 | 可选 tsink（Prometheus 兼容 HTTP）/ TDengine（REST SQL）轨迹热存储/查询 |
-| 空间库 | PostgreSQL + PostGIS：轨迹/位置 geometry(Point,4326)、GiST 索引、附近/bbox 查询；无扩展时降级 lat/lon |
+| 空间库 | PostgreSQL + PostGIS 或 KingbaseES + KGIS：轨迹/位置 geometry(Point,4326)、GiST 索引、附近/bbox 查询；无扩展时降级 lat/lon |
 | 演示体系 | 18 台车辆、7 日历史、5 个围栏、告警/指令种子数据、内嵌车队模拟器 |
 
 ## 2. 快速启动
@@ -118,7 +118,8 @@ Browser ── HTTPS / WebSocket ──> Axum API ──> services::telemetry
                               WebSocket 实时扇出
 ```
 
-- 业务数据只写 PostgreSQL/PostGIS；SQLite/MySQL 是兼容/演示后端。
+- 业务数据只写 PostgreSQL/PostGIS 或 KingbaseES/KGIS；SQLite/MySQL 是兼容/演示后端。
+- 信创部署见 [docs/KINGBASE_KGIS.md](docs/KINGBASE_KGIS.md)。
 - Redis 只做短期协调与实时广播，不承载业务真相。
 - Iggy/Walrus、tsink/TDengine、OpenRaft 均为可选组件，默认拓扑不依赖。
 - JT808 支持 TLS/mTLS + CIDR 白名单；JWT 使用 RS256/JWKS + refresh 轮换 + jti 吊销。
@@ -360,7 +361,7 @@ WebSocket 事件：`ready`、`telemetry`、`alert`、`command`、`fleet`、`resy
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `TSP_BIND` | `127.0.0.1:8090` | HTTP 监听地址 |
-| `TSP_DATABASE` | `data/tsp.db` | SQLite 路径，或 `postgres://` / `mysql://` URL |
+| `TSP_DATABASE` | `data/tsp.db` | SQLite 路径，或 `postgres://` / `mysql://` / `kingbase://` URL |
 | `TSP_WEB_DIR` | `web/` | 控制台静态资源目录 |
 | `TSP_JWT_PRIVATE_KEY_FILE` | 空 | RS256 私钥 PEM 文件；生产必填，集群多节点共用 |
 | `TSP_JWT_PUBLIC_KEY_FILE` | 空 | RS256 公钥 PEM；省略时从私钥派生 |

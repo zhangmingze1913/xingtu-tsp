@@ -93,10 +93,20 @@ pub enum Backend {
     Mysql,
 }
 
+fn kingbase_url_from(raw: &str) -> String {
+    for prefix in ["kingbase8://", "kingbasees://", "kingbase://"] {
+        if let Some(rest) = raw.strip_prefix(prefix) {
+            return format!("postgres://{rest}");
+        }
+    }
+    raw.to_string()
+}
+
 #[derive(Clone)]
 pub struct Db {
     pool: AnyPool,
     backend: Backend,
+    kingbase: bool,
     postgis: Arc<AtomicBool>,
 }
 
@@ -119,8 +129,11 @@ impl Db {
         postgis_enabled: bool,
     ) -> AppResult<Self> {
         let raw = database.as_ref();
+        let kingbase = crate::config::is_kingbase_url(raw);
         let (backend, url) = if raw.starts_with("postgres://") || raw.starts_with("postgresql://") {
             (Backend::Postgres, raw.to_string())
+        } else if kingbase {
+            (Backend::Postgres, kingbase_url_from(raw))
         } else if raw.starts_with("mysql://") || raw.starts_with("mariadb://") {
             (Backend::Mysql, mysql_url_from(raw))
         } else if raw.starts_with("sqlite:") {
@@ -136,7 +149,7 @@ impl Db {
             }
             (Backend::Sqlite, sqlite_url_from_path(raw))
         };
-        Self::connect(url, backend, false, postgis_enabled).await
+        Self::connect(url, backend, false, postgis_enabled, kingbase).await
     }
 
     /// Open a private in-memory SQLite database.
@@ -144,7 +157,14 @@ impl Db {
     /// The pool is limited to a single connection so every query in a test sees
     /// the same in-memory schema.
     pub async fn in_memory() -> AppResult<Self> {
-        Self::connect("sqlite::memory:".to_string(), Backend::Sqlite, true, false).await
+        Self::connect(
+            "sqlite::memory:".to_string(),
+            Backend::Sqlite,
+            true,
+            false,
+            false,
+        )
+        .await
     }
 
     async fn connect(
@@ -152,6 +172,7 @@ impl Db {
         backend: Backend,
         in_memory: bool,
         postgis_enabled: bool,
+        kingbase: bool,
     ) -> AppResult<Self> {
         // Required before the first AnyPool/AnyConnection is created. The call
         // is idempotent (see sqlx::any::install_default_drivers).
@@ -202,6 +223,7 @@ impl Db {
         let db = Self {
             pool,
             backend,
+            kingbase,
             postgis: Arc::new(AtomicBool::new(false)),
         };
         db.initialize().await?;
@@ -234,6 +256,22 @@ impl Db {
 
     pub fn postgis_enabled(&self) -> bool {
         self.postgis.load(Ordering::Relaxed)
+    }
+
+    pub fn is_kingbase(&self) -> bool {
+        self.kingbase
+    }
+
+    pub fn engine_name(&self) -> &'static str {
+        if self.kingbase {
+            "kingbase"
+        } else {
+            match self.backend {
+                Backend::Sqlite => "sqlite",
+                Backend::Postgres => "postgres",
+                Backend::Mysql => "mysql",
+            }
+        }
     }
 
     /// Return the canonical `?N` SQL unchanged.

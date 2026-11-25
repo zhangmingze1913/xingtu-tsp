@@ -523,6 +523,14 @@ GET /media/archive/{key}
 - 下载返回 raw 对象，`Content-Type` 为 `video/h264` 或 `audio/aac`
 - `key` 必须带 `TSP_RUSTFS_PREFIX`，拒绝 `..` 与反斜杠
 
+## 健康检查
+
+`/api/health` 与 `/api/ready` 输出 `database_engine`：
+
+```text
+sqlite | postgres | mysql | kingbase
+```
+
 ## 时序对账（TDengine）
 
 ```http

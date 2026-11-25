@@ -22,10 +22,17 @@ impl Db {
             Backend::Sqlite => Ok(SeedLock::default()),
             Backend::Postgres => {
                 let mut connection = self.pool.acquire().await?;
-                sqlx::query("SELECT pg_advisory_lock($1)")
+                if let Err(error) = sqlx::query("SELECT pg_advisory_lock($1)")
                     .bind(SEED_LOCK_ID)
                     .execute(&mut *connection)
-                    .await?;
+                    .await
+                {
+                    if self.kingbase {
+                        tracing::warn!(%error, "Kingbase seed advisory lock unavailable; seeding without cross-replica lock");
+                        return Ok(SeedLock::default());
+                    }
+                    return Err(error.into());
+                }
                 Ok(SeedLock {
                     backend: Backend::Postgres,
                     connection: Some(connection),

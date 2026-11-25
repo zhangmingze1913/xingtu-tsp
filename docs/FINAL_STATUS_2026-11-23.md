@@ -386,7 +386,7 @@ tdengine::tests::rest_query_maps_rows_to_points
 验证基线：
 
 ```text
-lib                    283 passed
+lib                    285 passed
 integration            32 passed
 fmt                    clean
 clippy --all-targets   clean
@@ -412,3 +412,14 @@ FFmpeg 不在 PATH，但测试使用 TSP_FFMPEG 绝对路径
 
 本地代码侧没有剩余的、可在当前环境验证的规划项。
 
+
+
+## 信创数据库（2026-11-25）
+
+- 新增 `kingbase://` / `kingbase8://` / `kingbasees://` 连接串
+- KingbaseES 走 PostgreSQL wire，`database_engine=kingbase`
+- KGIS 扩展尝试 `kingbase_spatial`/`postgis`
+- KGIS 不可用时降级 lat/lon
+- Kingbase 跳过 `INCLUDE` 覆盖索引，advisory/geography 失败降级
+- 文档：KINGBASE_KGIS.md
+- 真实 KES 未连接验证

@@ -85,3 +85,10 @@ PostGIS：`ST_Intersects(geom, ST_MakeEnvelope(min_lon,min_lat,max_lon,max_lat,4
   - `ANALYZE` 后观察 `EXPLAIN (ANALYZE, BUFFERS)`；
   - 轨迹大表按时间分区 + GiST 索引；
   - 高频轨迹可继续落 tsink/TDengine，PostGIS 保留最近 N 天空间索引。
+
+
+---
+
+## KingbaseES / KGIS
+
+信创环境可使用 KingbaseES + KGIS 替代 PostgreSQL + PostGIS，连接串与限制见 [KINGBASE_KGIS.md](KINGBASE_KGIS.md)。
