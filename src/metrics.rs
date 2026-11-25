@@ -195,6 +195,20 @@ impl Metrics {
             archive.playback_cache_miss
         ));
         let tdengine = crate::tdengine::stats();
+        out.push_str("# HELP xingtu_vault_k8s_login_ok_total Vault Kubernetes logins succeeded.\n");
+        out.push_str("# TYPE xingtu_vault_k8s_login_ok_total counter\n");
+        out.push_str(&format!(
+            "xingtu_vault_k8s_login_ok_total {}\n",
+            crate::vault_keys::VAULT_K8S_LOGIN_OK.load(std::sync::atomic::Ordering::Relaxed)
+        ));
+        out.push_str(
+            "# HELP xingtu_vault_k8s_login_failed_total Vault Kubernetes logins failed.\n",
+        );
+        out.push_str("# TYPE xingtu_vault_k8s_login_failed_total counter\n");
+        out.push_str(&format!(
+            "xingtu_vault_k8s_login_failed_total {}\n",
+            crate::vault_keys::VAULT_K8S_LOGIN_FAILED.load(std::sync::atomic::Ordering::Relaxed)
+        ));
         out.push_str("# HELP xingtu_vault_login_ok_total Vault AppRole logins succeeded.\n");
         out.push_str("# TYPE xingtu_vault_login_ok_total counter\n");
         out.push_str(&format!(

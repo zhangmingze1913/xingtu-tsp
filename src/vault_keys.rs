@@ -16,6 +16,8 @@ pub static VAULT_SYNC_OK: AtomicU64 = AtomicU64::new(0);
 pub static VAULT_SYNC_FAILED: AtomicU64 = AtomicU64::new(0);
 pub static VAULT_LOGIN_OK: AtomicU64 = AtomicU64::new(0);
 pub static VAULT_LOGIN_FAILED: AtomicU64 = AtomicU64::new(0);
+pub static VAULT_K8S_LOGIN_OK: AtomicU64 = AtomicU64::new(0);
+pub static VAULT_K8S_LOGIN_FAILED: AtomicU64 = AtomicU64::new(0);
 
 pub fn token_from_env() -> Option<String> {
     if let Ok(token) = std::env::var("TSP_VAULT_TOKEN") {
@@ -83,6 +85,60 @@ pub async fn login_approle(
         .ok_or_else(|| AppError::internal("vault login missing client_token"))
 }
 
+fn k8s_jwt_from_env() -> Option<String> {
+    if let Ok(jwt) = std::env::var("TSP_VAULT_K8S_JWT") {
+        if !jwt.trim().is_empty() {
+            return Some(jwt.trim().to_string());
+        }
+    }
+    let path = std::env::var("TSP_VAULT_K8S_JWT_FILE")
+        .unwrap_or_else(|_| "/var/run/secrets/kubernetes.io/serviceaccount/token".to_string());
+    std::fs::read_to_string(path.trim())
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+pub async fn login_kubernetes(
+    addr: &str,
+    role: &str,
+    jwt: &str,
+    namespace: Option<&str>,
+) -> AppResult<String> {
+    let base = addr.trim_end_matches('/');
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|error| AppError::internal(format!("vault client: {error}")))?;
+    let mut request = client
+        .post(format!("{base}/v1/auth/kubernetes/login"))
+        .json(&serde_json::json!({"role": role, "jwt": jwt}));
+    if let Some(namespace) = namespace.filter(|value| !value.trim().is_empty()) {
+        request = request.header("X-Vault-Namespace", namespace);
+    }
+    let response = request
+        .send()
+        .await
+        .map_err(|error| AppError::internal(format!("vault k8s login: {error}")))?;
+    if !response.status().is_success() {
+        return Err(AppError::internal(format!(
+            "vault k8s login HTTP {}",
+            response.status()
+        )));
+    }
+    let value: Value = response
+        .json()
+        .await
+        .map_err(|error| AppError::internal(format!("vault k8s login json: {error}")))?;
+    value
+        .get("auth")
+        .and_then(|value| value.get("client_token"))
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .ok_or_else(|| AppError::internal("vault k8s login missing client_token"))
+}
+
 /// Resolve a Vault token from the environment, a token file, or AppRole.
 pub async fn resolve_token(addr: &str, namespace: Option<&str>) -> AppResult<String> {
     if let Some(token) = token_from_env() {
@@ -105,9 +161,26 @@ pub async fn resolve_token(addr: &str, namespace: Option<&str>) -> AppResult<Str
                 }
             }
         }
-        _ => Err(AppError::internal(
-            "no Vault token or AppRole credentials configured",
-        )),
+        _ => {
+            let role = std::env::var("TSP_VAULT_K8S_ROLE")
+                .ok()
+                .filter(|value| !value.trim().is_empty());
+            if let (Some(role), Some(jwt)) = (role, k8s_jwt_from_env()) {
+                match login_kubernetes(addr, role.trim(), &jwt, namespace).await {
+                    Ok(token) => {
+                        VAULT_K8S_LOGIN_OK.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        return Ok(token);
+                    }
+                    Err(error) => {
+                        VAULT_K8S_LOGIN_FAILED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        return Err(error);
+                    }
+                }
+            }
+            Err(AppError::internal(
+                "no Vault token, AppRole, or Kubernetes credentials configured",
+            ))
+        }
     }
 }
 
@@ -309,5 +382,28 @@ mod tests {
         .expect("sync");
         assert!(path.exists());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn kubernetes_login_returns_client_token() {
+        use axum::{routing::post, Json, Router};
+
+        async fn login(Json(body): Json<Value>) -> Json<Value> {
+            assert_eq!(body["role"], "tsp");
+            assert_eq!(body["jwt"], "jwt-token");
+            serde_json::json!({"auth": {"client_token": "k8s-token"}}).into()
+        }
+        let app = Router::new().route("/v1/auth/kubernetes/login", post(login));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        let token = login_kubernetes(&format!("http://{addr}"), "tsp", "jwt-token", None)
+            .await
+            .expect("login");
+        assert_eq!(token, "k8s-token");
     }
 }

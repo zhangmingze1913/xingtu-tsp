@@ -455,6 +455,13 @@ TSP_VAULT_ROLE_ID=...
 TSP_VAULT_SECRET_ID_FILE=/var/run/secrets/vault-secret-id
 ```
 
+- Kubernetes auth：
+
+```bash
+TSP_VAULT_K8S_ROLE=tsp
+TSP_VAULT_K8S_JWT_FILE=/var/run/secrets/kubernetes.io/serviceaccount/token
+```
+
 - 每个同步周期重新登录获取 client_token
 - 指标：`xingtu_vault_sync_ok_total`、`failed_total`、`login_ok_total`、`login_failed_total`
 - Unix 下密钥文件必须仅 owner 可读写：`chmod 600`；group/world 可读会被拒绝
