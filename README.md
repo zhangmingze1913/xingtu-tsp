@@ -1,5 +1,7 @@
 # 星途车联 · TSP 智能运营平台（Rust）
 
+[![CI](https://github.com/zhangmingze1913/xingtu-tsp/actions/workflows/ci.yml/badge.svg)](https://github.com/zhangmingze1913/xingtu-tsp/actions/workflows/ci.yml)
+
 面向车联网 TSP（Telematics Service Provider）场景的可运行运营平台：统一接入车辆、T-Box、位置与告警数据，提供实时监控、电子围栏、行程分析、远程车控和运营看板。
 
 后端使用 **Rust + Axum + Tokio + SQLx**，数据库支持 **SQLite（单机）/ PostgreSQL / MySQL / KingbaseES（KGIS，信创）**，实时总线支持**进程内 broadcast / Redis Pub/Sub / Apache Iggy**，并可选接入 **tsink 时序库** 与 **Walrus 分布式日志**；前端为**零依赖、可离线运行**的运营控制台。平台同时内置 **JT/T 808-2019 子集 TCP 网关** 与终端模拟器，形成从终端接入到业务闭环的完整链路。

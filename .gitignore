@@ -13,3 +13,15 @@ secrets/*.pem
 /secrets/
 *.err
 *.out
+# Local databases/exports
+*.db
+*.sqlite
+*.sqlite3
+/backups/
+/exports/
+/archive-spool/
+/tdengine-spool/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

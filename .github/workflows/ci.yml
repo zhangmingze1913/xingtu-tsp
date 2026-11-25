@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libssl-dev ffmpeg
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.94.1
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --manifest-path Cargo.toml -- --check
+
+      - name: Clippy
+        run: cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
+
+      - name: Unit and protocol tests
+        run: cargo test --manifest-path Cargo.toml --lib
+
+      - name: Integration tests
+        run: |
+          cargo test --manifest-path Cargo.toml \
+            --test auth --test vehicles --test standards --test storage \
+            --test cluster --test standards_conformance --test jt809_sim \
+            --test jt809_tls_sim --test gb32960_sim --test jt1078_sim \
+            --test pii_vault --test standards_fuzz
