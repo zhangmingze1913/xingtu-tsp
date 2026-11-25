@@ -117,7 +117,20 @@ Invoke-RestMethod "http://127.0.0.1:8090/api/vehicles/nearby?lat=31.23&lon=121.4
 - 未在真实 KES 上验证 `pg_extension`、advisory lock、KGIS 函数兼容性
 - 未验证 KES 主备切换、长事务、连接池上限
 
-## 9. 验证清单
+## 9. 自动验证脚本
+
+```bash
+ksql -h KES_HOST -p 54321 -U tsp -d tsp -f scripts/kingbase-verify.sql
+```
+
+应用侧真实连接测试：
+
+```bash
+TSP_TEST_KINGBASE_URL='kingbase://tsp:password@kes:54321/tsp?sslmode=disable' \
+cargo test --lib kingbase_connection_smoke
+```
+
+## 10. 验证清单
 
 ```text
 [ ] KingbaseES 可连接（54321）

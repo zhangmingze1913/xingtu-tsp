@@ -159,3 +159,13 @@ async fn sqlite_engine_name_is_sqlite() {
     assert_eq!(db.engine_name(), "sqlite");
     assert!(!db.is_kingbase());
 }
+
+#[tokio::test]
+async fn kingbase_connection_smoke() {
+    let Ok(url) = std::env::var("TSP_TEST_KINGBASE_URL") else {
+        return;
+    };
+    let db = Db::open(&url).await.expect("KingbaseES connection");
+    assert_eq!(db.engine_name(), "kingbase");
+    assert!(db.ping().await.is_ok(), "KingbaseES ping");
+}
