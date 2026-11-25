@@ -1,5 +1,22 @@
 # 快速开始
 
+## 0. 一键初始化
+
+Windows：
+
+```powershell
+.\scripts\init-system.ps1
+```
+
+Linux/macOS：
+
+```bash
+chmod +x scripts/init-system.sh
+./scripts/init-system.sh
+```
+
+生成 `.env`、JWT/JT808 密钥和 SQLite 数据目录，详见 [INITIALIZATION.md](INITIALIZATION.md)。
+
 ## 1. 本地运行（SQLite）
 
 要求：

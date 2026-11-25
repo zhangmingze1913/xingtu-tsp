@@ -17,6 +17,7 @@
 
 ```text
 QUICKSTART.md                          快速开始
+INITIALIZATION.md                      系统初始化脚本
 USER_GUIDE.md                          使用手册
 TECHNICAL_SOLUTION.md                  技术方案
 ARCHITECTURE_DIAGRAMS.md               架构图集

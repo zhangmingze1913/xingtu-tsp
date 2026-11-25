@@ -37,6 +37,7 @@
 交付文档统一入口：[docs/README.md](docs/README.md)。
 
 - [快速开始](docs/QUICKSTART.md)
+- [系统初始化脚本](docs/INITIALIZATION.md)
 - [使用手册](docs/USER_GUIDE.md)
 - [技术文档](docs/TECHNICAL_GUIDE.md)
 - [技术方案](docs/TECHNICAL_SOLUTION.md)
