@@ -51,7 +51,14 @@ impl Db {
                 // NOT EXISTS` keeps bootstrap idempotent.
                 let mut connection = self.pool.acquire().await?;
                 for statement in split_sql_statements(&schema) {
-                    sqlx::query(statement).execute(&mut *connection).await?;
+                    if let Err(error) = sqlx::query(statement).execute(&mut *connection).await {
+                        let text = error.to_string().to_ascii_lowercase();
+                        if text.contains("duplicate key name") || text.contains("1061") {
+                            tracing::warn!(%error, "MySQL index already exists; continuing bootstrap");
+                        } else {
+                            return Err(error.into());
+                        }
+                    }
                 }
             }
         }
@@ -309,14 +316,18 @@ impl Db {
             .await?;
             tx.commit().await?;
         } else {
-            sqlx::query(
+            let ddl = if self.backend == Backend::Mysql {
+                "CREATE TABLE IF NOT EXISTS schema_migrations (
+                     version VARCHAR(64) PRIMARY KEY,
+                     applied_at VARCHAR(64) NOT NULL
+                 )"
+            } else {
                 "CREATE TABLE IF NOT EXISTS schema_migrations (
                      version TEXT PRIMARY KEY,
                      applied_at TEXT NOT NULL
-                 )",
-            )
-            .execute(&self.pool)
-            .await?;
+                 )"
+            };
+            sqlx::query(ddl).execute(&self.pool).await?;
         }
         Ok(())
     }
