@@ -656,10 +656,12 @@ async fn run_reconciliation_export(
     {
         crate::tdengine::EXPORT_JOBS_FAILED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         tracing::warn!(%error, job = %id, "reconciliation export failed");
+        let message = error.to_string();
         let _ = state
             .db
-            .update_reconciliation_export_job(&id, "failed", 0, None, Some(&error.to_string()))
+            .update_reconciliation_export_job(&id, "failed", 0, None, Some(&message))
             .await;
+        notify_export_failure(&id, &message).await;
     }
 }
 
@@ -838,6 +840,54 @@ async fn run_reconciliation_export_inner(
     let _ = state.db.release_export_lease(id, &lease_owner).await;
     crate::tdengine::EXPORT_JOBS_COMPLETED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     Ok(())
+}
+
+fn export_failure_payload(format: &str, job_id: &str, error: &str) -> Value {
+    let checked_at = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    if format.eq_ignore_ascii_case("alertmanager") {
+        json!([{
+            "labels": {
+                "alertname": "ReconciliationExportFailed",
+                "severity": "warning",
+                "service": "xingtu-tsp",
+                "job_id": job_id,
+            },
+            "annotations": {
+                "summary": "Reconciliation export job failed",
+                "description": error,
+            },
+            "startsAt": checked_at,
+        }])
+    } else {
+        json!({
+            "type": "reconciliation_export_failed",
+            "job_id": job_id,
+            "error": error,
+            "checked_at": checked_at,
+        })
+    }
+}
+
+async fn notify_export_failure(job_id: &str, error: &str) {
+    let Ok(url) = std::env::var("TSP_RECONCILE_ALERT_WEBHOOK") else {
+        return;
+    };
+    if url.trim().is_empty() {
+        return;
+    }
+    let format =
+        std::env::var("TSP_RECONCILE_ALERT_FORMAT").unwrap_or_else(|_| "generic".to_string());
+    let payload = export_failure_payload(&format, job_id, error);
+    match crate::tdengine::send_webhook(url.trim(), &payload).await {
+        Ok(()) => {
+            crate::tdengine::EXPORT_ALERTS_SENT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+        Err(send_error) => {
+            crate::tdengine::EXPORT_ALERTS_FAILED
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            tracing::warn!(%send_error, job = %job_id, "export failure alert failed");
+        }
+    }
 }
 
 async fn read_export_csv(id: &str) -> AppResult<Vec<u8>> {
@@ -1102,5 +1152,17 @@ mod token_tests {
         let mut tampered = token.clone();
         tampered.push('0');
         assert!(verify_export_token(&tampered).is_none());
+    }
+
+    #[test]
+    fn export_failure_payload_supports_formats() {
+        let generic = export_failure_payload("generic", "job-1", "boom");
+        assert_eq!(generic["type"], "reconciliation_export_failed");
+        assert_eq!(generic["job_id"], "job-1");
+        let am = export_failure_payload("alertmanager", "job-1", "boom");
+        assert_eq!(
+            am.as_array().expect("array")[0]["labels"]["alertname"],
+            "ReconciliationExportFailed"
+        );
     }
 }

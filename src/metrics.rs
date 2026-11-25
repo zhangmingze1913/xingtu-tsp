@@ -196,6 +196,20 @@ impl Metrics {
         ));
         let tdengine = crate::tdengine::stats();
         out.push_str(
+            "# HELP xingtu_reconcile_export_alerts_sent_total Export failure alerts sent.\n",
+        );
+        out.push_str("# TYPE xingtu_reconcile_export_alerts_sent_total counter\n");
+        out.push_str(&format!(
+            "xingtu_reconcile_export_alerts_sent_total {}\n",
+            tdengine.export_alerts_sent
+        ));
+        out.push_str("# HELP xingtu_reconcile_export_alerts_failed_total Export failure alert send failures.\n");
+        out.push_str("# TYPE xingtu_reconcile_export_alerts_failed_total counter\n");
+        out.push_str(&format!(
+            "xingtu_reconcile_export_alerts_failed_total {}\n",
+            tdengine.export_alerts_failed
+        ));
+        out.push_str(
             "# HELP xingtu_reconcile_export_jobs_recovered_total Stale export jobs recovered.\n",
         );
         out.push_str("# TYPE xingtu_reconcile_export_jobs_recovered_total counter\n");

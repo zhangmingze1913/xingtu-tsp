@@ -440,6 +440,45 @@
       ],
       "title": "Reconciliation export jobs / 24h",
       "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "id": 11,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(xingtu_reconcile_export_alerts_sent_total[24h]))",
+          "legendFormat": "sent/24h",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(xingtu_reconcile_export_alerts_failed_total[24h]))",
+          "legendFormat": "failed/24h",
+          "refId": "B"
+        }
+      ],
+      "title": "Export failure alerts / 24h",
+      "type": "stat"
     }
   ],
   "refresh": "30s",
