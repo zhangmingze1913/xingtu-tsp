@@ -157,6 +157,8 @@ cargo test --test postgis_health
 /api/health database_engine=postgres
 /api/health spatial_backend=postgis
 /api/ready spatial_backend=postgis
+Db::vehicles_in_bbox -> 命中测试车辆
+Db::vehicles_nearby -> 命中测试车辆
 ```
 
 这是 PostgreSQL/PostGIS 兼容路径验证，不是 KGIS 插件/License 验证。
