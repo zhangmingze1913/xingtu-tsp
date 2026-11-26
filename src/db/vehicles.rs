@@ -386,9 +386,30 @@ impl Db {
         Ok(())
     }
 
+    /// Delete the vehicle and its vaulted PII in one transaction.
+    ///
+    /// `pii_vault` has no foreign key to `vehicles`, so deleting the row alone
+    /// would leave orphaned encrypted PII.
     pub async fn delete_vehicle(&self, id: &str) -> AppResult<bool> {
-        let sql = self.sql("DELETE FROM vehicles WHERE id = ?1");
-        let result = self.query(&sql).bind(id).execute(self.pool()).await?;
+        let mut tx = self.pool().begin().await?;
+        let pii = self
+            .query("DELETE FROM pii_vault WHERE owner_type = 'vehicle' AND owner_id = ?1")
+            .bind(id)
+            .execute(&mut tx)
+            .await?;
+        let result = self
+            .query(&self.sql("DELETE FROM vehicles WHERE id = ?1"))
+            .bind(id)
+            .execute(&mut tx)
+            .await?;
+        tx.commit().await?;
+        if result.rows_affected() > 0 {
+            tracing::info!(
+                vehicle = id,
+                pii_rows = pii.rows_affected(),
+                "vehicle deleted"
+            );
+        }
         Ok(result.rows_affected() > 0)
     }
 

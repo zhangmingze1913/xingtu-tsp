@@ -4,9 +4,11 @@
 use xingtu_tsp::{db::Db, models::CreateVehicleRequest};
 
 const KEY: &str = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+static TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[tokio::test]
 async fn terminal_auth_code_is_vaulted_and_verifiable() {
+    let _guard = TEST_LOCK.lock().await;
     std::env::set_var("TSP_PII_KEY", KEY);
     std::env::remove_var("TSP_PII_PREVIOUS_KEYS");
 
@@ -112,6 +114,7 @@ async fn terminal_auth_code_is_vaulted_and_verifiable() {
 
 #[tokio::test]
 async fn vehicle_pii_erase_removes_vault_and_columns() {
+    let _guard = TEST_LOCK.lock().await;
     std::env::set_var("TSP_PII_KEY", KEY);
     let db = Db::in_memory().await.expect("db");
     let vehicle = db
@@ -144,4 +147,38 @@ async fn vehicle_pii_erase_removes_vault_and_columns() {
         .expect("vehicle");
     assert_eq!(cleared.vehicle.driver_phone, "");
     assert_eq!(cleared.vehicle.driver_name, "");
+}
+
+#[tokio::test]
+async fn vehicle_delete_removes_vaulted_pii() {
+    let _guard = TEST_LOCK.lock().await;
+    std::env::set_var("TSP_PII_KEY", KEY);
+    let db = Db::in_memory().await.expect("db");
+    let vehicle = db
+        .create_vehicle(CreateVehicleRequest {
+            vin: "LSVAA2A41NX999992".to_string(),
+            plate_no: "娌狝99992".to_string(),
+            model: "DeleteTest".to_string(),
+            color: "white".to_string(),
+            energy_type: "EV".to_string(),
+            driver_name: "Delete Driver".to_string(),
+            driver_phone: "13500135000".to_string(),
+            org_name: "DeleteOrg".to_string(),
+        })
+        .await
+        .expect("vehicle");
+    assert!(db
+        .get_pii("vehicle", &vehicle.vehicle.id, "driver_phone")
+        .await
+        .expect("read")
+        .is_some());
+    assert!(db
+        .delete_vehicle(&vehicle.vehicle.id)
+        .await
+        .expect("delete"));
+    assert!(db
+        .get_pii("vehicle", &vehicle.vehicle.id, "driver_phone")
+        .await
+        .expect("read after delete")
+        .is_none());
 }

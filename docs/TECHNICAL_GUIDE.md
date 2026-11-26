@@ -268,7 +268,7 @@ cargo test --test auth --test vehicles --test standards --test storage --test cl
 
 ```text
 lib 300 passed
-integration 46 passed
+integration 47 passed
 fmt clean
 clippy --all-targets clean
 ```

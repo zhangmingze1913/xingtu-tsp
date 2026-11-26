@@ -7,7 +7,7 @@
 - [x] `cargo fmt --check`
 - [x] `cargo clippy --all-targets -- -D warnings`
 - [x] `cargo test --lib`：300 passed
-- [x] 集成/协议测试：46 passed
+- [x] 集成/协议测试：47 passed
 - [x] `cargo build --release`
 - [x] Git 工作区干净
 - [x] 版本与提交记录可追溯
