@@ -73,7 +73,7 @@ STANDARDS_REASSESSMENT_2026-11-21.md
 
 | 项目 | 状态 |
 | --- | --- |
-| 单元/协议测试 | 298 passed |
+| 单元/协议测试 | 299 passed |
 | 集成测试 | 41 passed |
 | fmt / clippy | clean |
 | PostgreSQL 真实连接 | 已验证（PostGIS 16-3.4 容器） |

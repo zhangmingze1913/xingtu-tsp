@@ -32,7 +32,7 @@ GitHub 提交：符合
 
 | 能力 | 状态 | 证据/缺口 |
 | --- | --- | --- |
-| 单机 SQLite | 通过 | 298 单元测试 |
+| 单机 SQLite | 通过 | 299 单元测试 |
 | PostgreSQL 16 | 通过 | 真实容器 |
 | PostGIS 3.4 | 通过 | geometry/GiST/bbox |
 | PostgreSQL 主从 | 通过（手工） | streaming/async/lag0/promote |

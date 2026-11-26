@@ -74,7 +74,6 @@ pub(super) fn security(config: &Config) -> AppResult<()> {
             "production must not use admin123 as the administrator password",
         ));
     }
-    // PII and exports must not silently fall back to plaintext in production.
     let has_pii_key = std::env::var("TSP_PII_KEY")
         .map(|value| !value.trim().is_empty())
         .unwrap_or(false)
@@ -84,19 +83,9 @@ pub(super) fn security(config: &Config) -> AppResult<()> {
     let has_kms = std::env::var("TSP_KMS_ENDPOINT")
         .map(|value| !value.trim().is_empty())
         .unwrap_or(false);
-    if !has_pii_key && !has_kms {
-        return Err(AppError::internal(
-            "production requires TSP_PII_KEY/TSP_PII_KEY_FILE or TSP_KMS_ENDPOINT",
-        ));
-    }
-    if !std::env::var("TSP_EXPORT_REQUIRE_ENCRYPTION")
+    let export_required = std::env::var("TSP_EXPORT_REQUIRE_ENCRYPTION")
         .map(|value| matches!(value.as_str(), "1" | "true" | "TRUE" | "yes"))
-        .unwrap_or(false)
-    {
-        return Err(AppError::internal(
-            "production requires TSP_EXPORT_REQUIRE_ENCRYPTION=true",
-        ));
-    }
+        .unwrap_or(false);
     let has_export_key = [
         "TSP_EXPORT_ENCRYPTION_KEY",
         "TSP_EXPORT_ENCRYPTION_KEYS",
@@ -109,6 +98,28 @@ pub(super) fn security(config: &Config) -> AppResult<()> {
             .map(|value| !value.trim().is_empty())
             .unwrap_or(false)
     });
+    validate_production_secrets(has_pii_key, has_kms, export_required, has_export_key)?;
+    Ok(())
+}
+
+/// Pure production-secret policy, split from env reads so it is testable
+/// without mutating process-global environment variables.
+fn validate_production_secrets(
+    has_pii_key: bool,
+    has_kms: bool,
+    export_required: bool,
+    has_export_key: bool,
+) -> AppResult<()> {
+    if !has_pii_key && !has_kms {
+        return Err(AppError::internal(
+            "production requires TSP_PII_KEY/TSP_PII_KEY_FILE or TSP_KMS_ENDPOINT",
+        ));
+    }
+    if !export_required {
+        return Err(AppError::internal(
+            "production requires TSP_EXPORT_REQUIRE_ENCRYPTION=true",
+        ));
+    }
     if !has_export_key {
         return Err(AppError::internal(
             "production requires an export encryption key (TSP_EXPORT_ENCRYPTION_KEY/KEYS or file)",
@@ -141,4 +152,18 @@ pub(super) fn cluster(config: &Config) -> AppResult<()> {
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_production_secrets;
+
+    #[test]
+    fn production_secret_policy_rejects_plaintext_paths() {
+        assert!(validate_production_secrets(false, false, true, true).is_err());
+        assert!(validate_production_secrets(true, false, false, true).is_err());
+        assert!(validate_production_secrets(true, false, true, false).is_err());
+        assert!(validate_production_secrets(true, false, true, true).is_ok());
+        assert!(validate_production_secrets(false, true, true, true).is_ok());
+    }
 }
