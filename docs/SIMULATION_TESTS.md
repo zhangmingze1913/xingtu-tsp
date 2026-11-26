@@ -36,6 +36,7 @@
 | `jt1078_sim.rs` | 合成媒体 | 信令、RTP 包、H.264 重组 | 真实摄像头/弱网 |
 | `standards_conformance.rs` | 固定夹具/负向 | 808/809/1078/32960 帧 | 第三方一致性 |
 | `standards_fuzz.rs` | 随机输入 | 不 panic/不越界 | 语义正确性 |
+| `postgis_health.rs` | 真实 PostGIS（opt-in） | health/ready 的 postgis 分支 | KGIS 插件/License |
 
 ## 3. JT/T 808 模拟终端
 

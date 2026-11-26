@@ -140,3 +140,23 @@ bbox:   Bitmap Index Scan on idx_telemetry_geom
 - 100 万级 nearby 14.6s 表明 geography 距离过滤仍重；生产应按时间分区/缩小时间窗，或把高频轨迹交给 TDengine/tsink。
 - bbox 348ms 说明 GiST 几何索引可用。
 - 结果来自 4 vCPU / 12 GB Docker Desktop，不是生产容量承诺。
+
+
+## 健康接口 PostGIS 分支
+
+可选测试（需要一次性 PostGIS 数据库）：
+
+```powershell
+$env:TSP_TEST_POSTGIS_URL='postgres://tsp:tsp-dev-password@127.0.0.1:55433/tsp?sslmode=disable'
+cargo test --test postgis_health
+```
+
+验证：
+
+```text
+/api/health database_engine=postgres
+/api/health spatial_backend=postgis
+/api/ready spatial_backend=postgis
+```
+
+这是 PostgreSQL/PostGIS 兼容路径验证，不是 KGIS 插件/License 验证。
