@@ -48,7 +48,7 @@
 
 | 技术域 | 证据 | 生产缺口 |
 | --- | --- | --- |
-| Rust/Axum/SQLx | 299 单元/协议测试 | 无生产长稳 |
+| Rust/Axum/SQLx | 300 单元/协议测试 | 无生产长稳 |
 | PostgreSQL/PostGIS | 真实容器；GiST/geography | 无生产 HA/PITR |
 | KingbaseES | V8R6/V9 关系型 | KGIS 缺失 |
 | MySQL | 真实容器/API | 版本矩阵不足 |

@@ -267,7 +267,7 @@ cargo test --test auth --test vehicles --test standards --test storage --test cl
 当前基线：
 
 ```text
-lib 299 passed
+lib 300 passed
 integration 46 passed
 fmt clean
 clippy --all-targets clean

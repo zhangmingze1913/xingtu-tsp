@@ -400,10 +400,10 @@ pub const CATALOG: &[MessageSpec] = &[
         standard: "JT/T 809",
         version: "2019",
         message_id: "frame",
-        name: "30 字节头/转义/CRC32/加密",
+        name: "30 字节头/转义/CRC32（经典帧加密/压缩未实现；2019 头+密文 API 为候选）",
         direction: "p-p",
         category: StandardCategory::Industry,
-        implementation: Done,
+        implementation: Partial,
     },
     MessageSpec {
         standard: "JT/T 809",
@@ -965,5 +965,19 @@ mod tests {
         assert!(CATALOG
             .iter()
             .any(|spec| spec.standard == "GB/T 32960" && spec.version == "32960.3-2025"));
+    }
+}
+
+#[cfg(test)]
+mod capability_tests {
+    use super::*;
+
+    #[test]
+    fn jt809_frame_is_not_fully_done() {
+        let frame = CATALOG
+            .iter()
+            .find(|spec| spec.standard == "JT/T 809" && spec.message_id == "frame")
+            .expect("809 frame");
+        assert_eq!(frame.implementation, Partial);
     }
 }

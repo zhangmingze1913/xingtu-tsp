@@ -73,7 +73,7 @@ STANDARDS_REASSESSMENT_2026-11-21.md
 
 | 项目 | 状态 |
 | --- | --- |
-| 单元/协议测试 | 299 passed |
+| 单元/协议测试 | 300 passed |
 | 集成测试 | 46 passed |
 | fmt / clippy | clean |
 | PostgreSQL 真实连接 | 已验证（PostGIS 16-3.4 容器） |
@@ -88,3 +88,5 @@ STANDARDS_REASSESSMENT_2026-11-21.md
 > 不要把“代码通过测试”表述为“标准合规”或“生产就绪”。标准边界见 [STANDARDS.md](STANDARDS.md) 和 [SIMULATION_SCOPE.md](SIMULATION_SCOPE.md)。
 
 - [GOAL_HANDOVER_2026-11-26.md](GOAL_HANDOVER_2026-11-26.md)
+
+- [DEFECT_REGISTER_2026-11-27.md](DEFECT_REGISTER_2026-11-27.md)
