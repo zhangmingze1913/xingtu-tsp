@@ -32,6 +32,7 @@ RECOMMENDATIONS.md                     选型与使用建议
 DELIVERY_CHECKLIST.md                  交付/验收清单
 PRODUCTION_READINESS.md                生产就绪评估/退出计划
 PRODUCTION_GO_NO_GO_2026-11-26.md      生产 Go/No-Go 评估
+SIMULATION_TESTS.md                    模拟测试矩阵
 ```
 
 ## 3. 专题文档
@@ -72,7 +73,7 @@ STANDARDS_REASSESSMENT_2026-11-21.md
 | 项目 | 状态 |
 | --- | --- |
 | 单元/协议测试 | 298 passed |
-| 集成测试 | 39 passed |
+| 集成测试 | 40 passed |
 | fmt / clippy | clean |
 | PostgreSQL 真实连接 | 已验证（PostGIS 16-3.4 容器） |
 | PostgreSQL 主从 | 已验证（流复制/promote smoke） |
