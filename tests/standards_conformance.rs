@@ -4,7 +4,7 @@
 //! codec seams fail loudly instead of silently accepting corrupt frames.
 
 use xingtu_tsp::jt808::codec;
-use xingtu_tsp::standards::{gb32960, jt809};
+use xingtu_tsp::standards::{gb32960, jt1078, jt809};
 
 #[test]
 fn jt809_login_roundtrip_and_bad_crc() {
@@ -140,4 +140,17 @@ fn jt809_session_handshake_rejects_invalid_transitions() {
     rejected.mark_login_sent().expect("login");
     rejected.on_login_response(1).expect("response");
     assert_eq!(rejected.state(), jt809::Jt809SessionState::Disconnected);
+}
+
+#[test]
+fn jt1078_media_fixture_decodes() {
+    let raw = decode_hex(include_str!("fixtures/standards/jt1078_media.hex"));
+    let packet = jt1078::Jt1078Packet::decode(&raw).expect("media packet");
+    assert_eq!(packet.sim, [0x89, 0x86, 0x00, 0x12, 0x34, 0x56]);
+    assert_eq!(packet.channel, 1);
+    assert!(packet.is_keyframe());
+    assert_eq!(packet.body, vec![0, 0, 0, 1]);
+    let mut short = raw.clone();
+    short.pop();
+    assert!(jt1078::Jt1078Packet::decode(&short).is_err());
 }
