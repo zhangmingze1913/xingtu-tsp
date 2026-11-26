@@ -152,3 +152,35 @@ async fn simulated_terminal_register_auth_heartbeat_location_reconnect() {
     server.abort();
     let _ = server.await;
 }
+
+#[tokio::test]
+async fn fragmented_frame_is_reassembled() {
+    let probe = TcpListener::bind("127.0.0.1:0").await.expect("probe");
+    let addr = probe.local_addr().expect("addr");
+    drop(probe);
+
+    let mut config = common::test_config();
+    config.jt808_addr = addr.to_string();
+    config.jt808_allow_plaintext = true;
+    let state = AppState::new(config, Db::in_memory().await.expect("db"));
+    let server = tokio::spawn(async move { jt808::serve(state).await });
+
+    let mut stream = TcpStream::connect(addr).await.expect("connect");
+    let raw = build_frame(
+        jt808::MSG_TERMINAL_REGISTER,
+        "013800000099",
+        1,
+        &registration_body(),
+    )
+    .expect("frame");
+    let split = raw.len() / 2;
+    stream.write_all(&raw[..split]).await.expect("first half");
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    stream.write_all(&raw[split..]).await.expect("second half");
+    let response = read_frame(&mut stream).await;
+    assert_eq!(response.msg_id, jt808::MSG_REGISTER_RESPONSE);
+    assert_eq!(response.body[2], 0, "fragmented register rejected");
+
+    server.abort();
+    let _ = server.await;
+}
