@@ -209,7 +209,7 @@ PostGIS 100万 nearby 14.6s（全量 count）
 
 ```text
 单元/协议：299 passed
-集成：42 passed
+集成：43 passed
 真实容器：PG/PostGIS/MySQL/Redis/RustFS/TDengine/Vault/Iggy/Walrus/tsink
 K8s：kind smoke
 ```

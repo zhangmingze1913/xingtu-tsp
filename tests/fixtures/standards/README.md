@@ -6,7 +6,8 @@ must not be represented as third-party test evidence.
 
 | File | Shape | Purpose |
 | --- | --- | --- |
-| `jt808_0100_2019.hex` | 0x0100 registration body | manufacturer/model fields |
+| `jt808_0100_2019.hex` | 0x0100 legacy 37-byte registration body | manufacturer/model fields |
+| `jt808_0100_2019_layout.hex` | 0x0100 2019 76-byte body | province/city/manufacturer/model/terminal/color |
 | `jt808_0107_2019.hex` | 0x0107 terminal attributes body | attribute/raw field |
 | `jt808_0200_mandatory.hex` | 0x0200 basic location body | lat/lon parsing |
 | `jt808_8203.hex` | 0x8203 alarm acknowledgement body | short control body |

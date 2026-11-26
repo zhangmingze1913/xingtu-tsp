@@ -154,3 +154,19 @@ fn jt1078_media_fixture_decodes() {
     short.pop();
     assert!(jt1078::Jt1078Packet::decode(&short).is_err());
 }
+
+#[test]
+fn jt808_2019_registration_layout_fields() {
+    let raw = decode_hex(include_str!(
+        "fixtures/standards/jt808_0100_2019_layout.hex"
+    ));
+    let registration = codec::parse_registration(&raw).expect("2019 layout");
+    assert_eq!(registration.layout, "2019-table8");
+    assert_eq!(registration.province, 0x0031);
+    assert_eq!(registration.city, 0x0001);
+    assert_eq!(registration.manufacturer, "MANUFACTUR1");
+    assert_eq!(registration.model, "MODEL-2026");
+    assert_eq!(registration.terminal_id, "013800000001");
+    assert_eq!(registration.plate_color, 1);
+    assert!(registration.plate_no.is_empty());
+}
