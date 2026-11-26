@@ -83,6 +83,17 @@ PostGIS 100 万行 nearby：14.6 s（全量 count）
 
 ## 5. 安全与合规
 
+生产启动校验已强制：
+
+```text
+TSP_PII_KEY / TSP_PII_KEY_FILE / TSP_KMS_ENDPOINT 至少一个
+TSP_EXPORT_REQUIRE_ENCRYPTION=true
+导出加密密钥至少一个
+```
+
+缺失时进程拒绝以 production 启动，避免 PII/导出静默明文。
+
+
 已有：
 
 ```text

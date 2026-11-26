@@ -71,7 +71,47 @@ pub(super) fn security(config: &Config) -> AppResult<()> {
     }
     if config.admin_password.as_deref() == Some("admin123") {
         return Err(AppError::internal(
-            "生产环境禁止使用 admin123 作为管理员密码",
+            "production must not use admin123 as the administrator password",
+        ));
+    }
+    // PII and exports must not silently fall back to plaintext in production.
+    let has_pii_key = std::env::var("TSP_PII_KEY")
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false)
+        || std::env::var("TSP_PII_KEY_FILE")
+            .map(|value| !value.trim().is_empty())
+            .unwrap_or(false);
+    let has_kms = std::env::var("TSP_KMS_ENDPOINT")
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false);
+    if !has_pii_key && !has_kms {
+        return Err(AppError::internal(
+            "production requires TSP_PII_KEY/TSP_PII_KEY_FILE or TSP_KMS_ENDPOINT",
+        ));
+    }
+    if !std::env::var("TSP_EXPORT_REQUIRE_ENCRYPTION")
+        .map(|value| matches!(value.as_str(), "1" | "true" | "TRUE" | "yes"))
+        .unwrap_or(false)
+    {
+        return Err(AppError::internal(
+            "production requires TSP_EXPORT_REQUIRE_ENCRYPTION=true",
+        ));
+    }
+    let has_export_key = [
+        "TSP_EXPORT_ENCRYPTION_KEY",
+        "TSP_EXPORT_ENCRYPTION_KEYS",
+        "TSP_EXPORT_ENCRYPTION_KEY_FILE",
+        "TSP_EXPORT_ENCRYPTION_KEYS_FILE",
+    ]
+    .iter()
+    .any(|name| {
+        std::env::var(name)
+            .map(|value| !value.trim().is_empty())
+            .unwrap_or(false)
+    });
+    if !has_export_key {
+        return Err(AppError::internal(
+            "production requires an export encryption key (TSP_EXPORT_ENCRYPTION_KEY/KEYS or file)",
         ));
     }
     Ok(())

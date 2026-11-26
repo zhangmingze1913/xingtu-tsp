@@ -73,3 +73,16 @@ Use Kubernetes Secrets, Vault or an external KMS.
 ## Disclosure
 
 Please allow reasonable time for a fix before public disclosure. This project does not currently operate a bug bounty program.
+
+
+## Production startup guards
+
+`TSP_ENV=production` now rejects startup unless:
+
+```text
+TSP_PII_KEY / TSP_PII_KEY_FILE / TSP_KMS_ENDPOINT is configured
+TSP_EXPORT_REQUIRE_ENCRYPTION=true
+an export encryption key is configured
+```
+
+This prevents accidental plaintext PII or export data in production.

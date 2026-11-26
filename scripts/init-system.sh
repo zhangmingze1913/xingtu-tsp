@@ -143,6 +143,7 @@ if [ "$PRODUCTION" -eq 1 ]; then PLAINTEXT=false; fi
   printf 'TSP_EXPORT_TOKEN_SECRET=%s\n' "$(rand_hex 32)"
   printf 'TSP_EXPORT_ENCRYPTION_KEY=%s\n' "$(rand_b64 32)"
   printf 'TSP_EXPORT_ENCRYPTION_KEY_ID=current\n'
+  printf 'TSP_EXPORT_REQUIRE_ENCRYPTION=true\n'
   printf 'RUST_LOG=xingtu_tsp=info\n'
   if [ -n "$JWT_KEY" ]; then
     printf 'TSP_JWT_PRIVATE_KEY_FILE=%s\n' "$JWT_KEY"

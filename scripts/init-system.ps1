@@ -162,6 +162,7 @@ Write-EnvLine $lines 'TSP_PII_KEY' (New-RandomBase64 32)
 Write-EnvLine $lines 'TSP_EXPORT_TOKEN_SECRET' (New-RandomHex 32)
 Write-EnvLine $lines 'TSP_EXPORT_ENCRYPTION_KEY' (New-RandomBase64 32)
 Write-EnvLine $lines 'TSP_EXPORT_ENCRYPTION_KEY_ID' 'current'
+Write-EnvLine $lines 'TSP_EXPORT_REQUIRE_ENCRYPTION' 'true'
 Write-EnvLine $lines 'RUST_LOG' 'xingtu_tsp=info'
 
 if ($jwtKeyFile) {
