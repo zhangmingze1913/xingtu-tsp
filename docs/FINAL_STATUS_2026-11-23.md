@@ -7,7 +7,7 @@
 
 ```text
 lib                    263 passed
-integration            44 passed
+integration            45 passed
 fmt                    clean
 clippy                 clean
 ```
@@ -229,7 +229,7 @@ NotApplicable    7
 
 ```text
 lib                    263 passed
-integration            44 passed
+integration            45 passed
 fmt                    clean
 clippy -D warnings     clean
 cluster                3 nodes healthy
@@ -387,7 +387,7 @@ tdengine::tests::rest_query_maps_rows_to_points
 
 ```text
 lib                    299 passed
-integration            44 passed
+integration            45 passed
 fmt                    clean
 clippy --all-targets   clean
 YAML/JSON              20 files parsed

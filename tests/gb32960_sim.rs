@@ -2,12 +2,14 @@
 //! Covers implemented commands/sections only; not certification evidence.
 
 use xingtu_tsp::standards::gb32960::{
-    self, Gb32960AlarmData, Gb32960BatteryTemperature, Gb32960BatteryVoltage, Gb32960ExtremeData,
-    Gb32960Frame, Gb32960LocationData, Gb32960Login, Gb32960Logout, Gb32960Motor, Gb32960MotorData,
-    Gb32960PlatformAck, Gb32960PlatformLogin, Gb32960RealtimeData, Gb32960Section,
-    GB32960_HEARTBEAT, GB32960_LOGIN, GB32960_LOGOUT, GB32960_PLATFORM_LOGIN,
-    GB32960_PLATFORM_LOGOUT, GB32960_REALTIME, GB32960_SUPPLEMENT, SEC_ALARM, SEC_BATTERY_TEMP,
-    SEC_BATTERY_VOLTAGE, SEC_EXTREME, SEC_LOCATION, SEC_MOTOR, SEC_VEHICLE,
+    self, Gb32960Activation, Gb32960ActivationAck, Gb32960AlarmData, Gb32960BatteryTemperature,
+    Gb32960BatteryVoltage, Gb32960ExtremeData, Gb32960Frame, Gb32960HighVoltageMonitor,
+    Gb32960HighVoltageTrigger, Gb32960LocationData, Gb32960Login, Gb32960Logout, Gb32960Motor,
+    Gb32960MotorData, Gb32960PlatformAck, Gb32960PlatformLogin, Gb32960RealtimeData,
+    Gb32960Section, Gb32960Signature, GB32960_HEARTBEAT, GB32960_LOGIN, GB32960_LOGOUT,
+    GB32960_PLATFORM_LOGIN, GB32960_PLATFORM_LOGOUT, GB32960_REALTIME, GB32960_SUPPLEMENT,
+    SEC_ALARM, SEC_BATTERY_TEMP, SEC_BATTERY_VOLTAGE, SEC_EXTREME, SEC_LOCATION, SEC_MOTOR,
+    SEC_VEHICLE,
 };
 
 const VIN: &str = "LSVAA123456789012";
@@ -296,4 +298,47 @@ async fn tcp_gateway_ingests_frame_and_persists_trajectory() {
     .expect("ingested");
     assert_eq!(vehicle_id.len(), 36);
     handle.abort();
+}
+
+#[test]
+fn gb32960_activation_signature_and_monitor_window() {
+    let signature = Gb32960Signature {
+        sign_type: 1,
+        r: vec![0xAA, 0xBB],
+        s: vec![0xCC],
+    };
+    let encoded = signature.encode().expect("signature");
+    assert_eq!(encoded, vec![1, 0, 2, 0xAA, 0xBB, 0, 1, 0xCC]);
+    assert_eq!(
+        Gb32960Signature::decode(&encoded).expect("decode"),
+        signature
+    );
+
+    let activation = Gb32960Activation {
+        time: [0x26, 0x11, 0x1A, 0x0A, 0x00, 0x00],
+        chip_id: "CHIP000000000001".to_string(),
+        public_key: vec![0x04, 0x01, 0x02],
+        vin: VIN.to_string(),
+        signature,
+    };
+    let body = activation.encode().expect("activation");
+    assert_eq!(
+        Gb32960Activation::decode(&body).expect("activation decode"),
+        activation
+    );
+    assert_eq!(
+        Gb32960ActivationAck::decode(&Gb32960ActivationAck { status: 1, info: 0 }.encode())
+            .expect("ack"),
+        Gb32960ActivationAck { status: 1, info: 0 }
+    );
+
+    let mut monitor = Gb32960HighVoltageMonitor::start(Gb32960HighVoltageTrigger::DriveEnd, 0);
+    assert!(monitor.tick(0));
+    assert!(!monitor.tick(0), "capped to one sample per second");
+    assert!(monitor.tick(1));
+    assert!(!monitor.is_active(3601));
+    assert!(!monitor.report_due(3569));
+    assert!(monitor.report_due(3570));
+    monitor.mark_reported();
+    assert!(!monitor.report_due(3571));
 }
