@@ -1,8 +1,10 @@
 use std::{
     collections::HashMap,
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex, RwLock},
     time::{Duration, Instant},
 };
+
+use tokio::sync::Mutex as AsyncMutex;
 
 use crate::{
     auth_keys::JwtKeys, cluster::Cluster, config::Config, db::Db, error::AppResult,
@@ -83,6 +85,7 @@ impl TokenRevocations {
 pub(crate) struct DashboardCache {
     ttl: Duration,
     entries: RwLock<HashMap<String, (Instant, String)>>,
+    inflight: Mutex<HashMap<String, Arc<AsyncMutex<()>>>>,
 }
 
 impl DashboardCache {
@@ -90,7 +93,24 @@ impl DashboardCache {
         Self {
             ttl,
             entries: RwLock::new(HashMap::new()),
+            inflight: Mutex::new(HashMap::new()),
         }
+    }
+
+    /// Per-organization single-flight guard used to coalesce cold cache
+    /// refreshes without serializing unrelated organizations.
+    pub(crate) fn lock_for(&self, org: &str) -> Arc<AsyncMutex<()>> {
+        let mut inflight = match self.inflight.lock() {
+            Ok(inflight) => inflight,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if inflight.len() > 64 {
+            inflight.clear();
+        }
+        inflight
+            .entry(org.to_string())
+            .or_insert_with(|| Arc::new(AsyncMutex::new(())))
+            .clone()
     }
 
     pub(crate) fn get(&self, org: &str) -> Option<String> {

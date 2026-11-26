@@ -16,6 +16,14 @@ pub async fn overview(State(state): State<AppState>, user: AuthUser) -> AppResul
         return Ok(json_response(body));
     }
 
+    // Coalesce a cold-cache burst for the same organization. The second get
+    // re-checks after waiting so followers reuse the leader's result.
+    let refresh = state.dashboard_cache.lock_for(org);
+    let _guard = refresh.lock().await;
+    if let Some(body) = state.dashboard_cache.get(org) {
+        return Ok(json_response(body));
+    }
+
     let overview = state.db.dashboard_overview(org).await?;
     let body = serde_json::to_string(&overview)
         .map_err(|_| AppError::internal("dashboard serialization failed"))?;
