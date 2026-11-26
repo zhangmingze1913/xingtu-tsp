@@ -79,3 +79,6 @@ PostgreSQL `EXPLAIN (ANALYZE, BUFFERS)`：
 3. release 构建下做更大数据量（10 万 telemetry）容量测试。
 4. release 构建 + PG `EXPLAIN (ANALYZE, BUFFERS)` 做真实容量测试。
 5. 登录增加每用户令牌/会话缓存需谨慎，不建议缓存明文密码校验结果。
+
+
+> 2026-11-26 dashboard 趋势优化与 release 复测见 [PERFORMANCE_EVALUATION_2026-11-25.md](PERFORMANCE_EVALUATION_2026-11-25.md)。

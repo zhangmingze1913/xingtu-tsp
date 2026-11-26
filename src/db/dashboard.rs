@@ -112,60 +112,65 @@ impl Db {
         let maintenance = get("maintenance");
         let online = moving + idle + charging + online_extra;
 
-        let trend_futures = days.iter().map(|(start, end, label)| {
-            let start = start.clone();
-            let end = end.clone();
-            let label = label.clone();
-            let org = org.to_string();
-            async move {
-                let sql = self.sql(
-                    "SELECT COALESCE(SUM(t.distance_km), 0) FROM trips t
-                     JOIN vehicles v ON v.id = t.vehicle_id
-                     WHERE t.start_ts >= ?1 AND t.start_ts < ?2
-                       AND (?3 = '*' OR v.org_name = ?3)",
-                );
-                let mileage_row = self
-                    .query(&sql)
-                    .bind(&start)
-                    .bind(&end)
-                    .bind(&org)
-                    .fetch_one(self.pool())
-                    .await?;
-                let mileage = get_f64(&mileage_row, 0)?;
-
-                let sql = self.sql(
-                    "SELECT COUNT(*) FROM alerts a
-                     JOIN vehicles v ON v.id = a.vehicle_id
-                     WHERE a.ts >= ?1 AND a.ts < ?2
-                       AND (?3 = '*' OR v.org_name = ?3)",
-                );
-                let count_row = self
-                    .query(&sql)
-                    .bind(&start)
-                    .bind(&end)
-                    .bind(&org)
-                    .fetch_one(self.pool())
-                    .await?;
-                let count = get_i64(&count_row, 0)?;
-                Ok::<_, crate::error::AppError>((
-                    DailyPoint {
-                        label: label.clone(),
-                        value: (mileage * 10.0).round() / 10.0,
-                    },
-                    DailyPoint {
-                        label,
-                        value: count as f64,
-                    },
-                ))
+        // One scan per metric instead of 14 round-trips (7 days x 2
+        // metrics). CASE ranges keep the exact China-day UTC boundaries.
+        let mut mileage_sql = String::from("SELECT ");
+        for (index, _) in days.iter().enumerate() {
+            if index > 0 {
+                mileage_sql.push_str(", ");
             }
-        });
-        let trend_pairs = futures_util::future::join_all(trend_futures).await;
+            let start_param = 2 + index * 2;
+            let end_param = start_param + 1;
+            mileage_sql.push_str(&format!(
+                "COALESCE(SUM(CASE WHEN t.start_ts >= ?{start_param} AND t.start_ts < ?{end_param} THEN t.distance_km ELSE 0 END), 0)"
+            ));
+        }
+        mileage_sql.push_str(
+            " FROM trips t JOIN vehicles v ON v.id = t.vehicle_id
+              WHERE (?1 = '*' OR v.org_name = ?1)
+                AND t.start_ts >= ?2 AND t.start_ts < ?15",
+        );
+        let mut mileage_query = self.query(&mileage_sql).bind(org);
+        for (start, end, _) in &days {
+            mileage_query = mileage_query.bind(start).bind(end);
+        }
+        let mileage_row = mileage_query.fetch_one(self.pool()).await?;
+
+        let mut alerts_sql = String::from("SELECT ");
+        for (index, _) in days.iter().enumerate() {
+            if index > 0 {
+                alerts_sql.push_str(", ");
+            }
+            let start_param = 2 + index * 2;
+            let end_param = start_param + 1;
+            alerts_sql.push_str(&format!(
+                "COALESCE(SUM(CASE WHEN a.ts >= ?{start_param} AND a.ts < ?{end_param} THEN 1 ELSE 0 END), 0)"
+            ));
+        }
+        alerts_sql.push_str(
+            " FROM alerts a JOIN vehicles v ON v.id = a.vehicle_id
+              WHERE (?1 = '*' OR v.org_name = ?1)
+                AND a.ts >= ?2 AND a.ts < ?15",
+        );
+        let mut alerts_query = self.query(&alerts_sql).bind(org);
+        for (start, end, _) in &days {
+            alerts_query = alerts_query.bind(start).bind(end);
+        }
+        let alerts_row = alerts_query.fetch_one(self.pool()).await?;
+
         let mut mileage_7d = Vec::with_capacity(days.len());
         let mut alert_trend_7d = Vec::with_capacity(days.len());
-        for pair in trend_pairs {
-            let (mileage, alerts) = pair?;
-            mileage_7d.push(mileage);
-            alert_trend_7d.push(alerts);
+        for (index, (_, _, label)) in days.iter().enumerate() {
+            let mileage = get_f64(&mileage_row, index)?;
+            let alerts = get_i64(&alerts_row, index)?;
+            mileage_7d.push(DailyPoint {
+                label: label.clone(),
+                value: (mileage * 10.0).round() / 10.0,
+            });
+            alert_trend_7d.push(DailyPoint {
+                label: label.clone(),
+                value: alerts as f64,
+            });
         }
 
         let recent_alerts = {

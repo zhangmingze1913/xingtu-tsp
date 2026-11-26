@@ -233,3 +233,32 @@ bbox:   Bitmap Index Scan on idx_telemetry_geom
 - bbox 在 100 万级仍为百毫秒级，GiST 有效。
 - nearby 的 geography 距离计算在 100 万级达到 14.6s；必须加时间窗/分页/分区，或把高频轨迹交给 TDengine。
 - 这是全量 count，不是分页 API 延迟。
+
+
+## 10. 2026-11-26 dashboard 查询优化
+
+热点：7 天趋势原本每天 2 条 SQL，共 14 次数据库往返。
+
+优化：`src/db/dashboard.rs` 改为两条聚合 SQL，每条用 7 个 `CASE` 范围精确覆盖中国日边界。
+
+```text
+原：14 次往返
+新：2 次往返（mileage + alerts）
+```
+
+### release 复测
+
+环境：KingbaseES V8R6，18 台 demo 车辆，release 构建。
+
+```text
+车辆列表 100 次：avg 12.9 ms，p50 11.4 ms，p95 31.6 ms
+并发 10x10：100 请求 0.32 s，313.4 req/s，0 失败
+dashboard 冷：约 144–679 ms（KES/缓存冷启动波动）
+dashboard 热：p50 约 1.6–2.9 ms
+```
+
+说明：
+
+- 并发首轮曾出现 16.2 req/s 的冷启动异常，预热后复测为 313.4 req/s；报告保留热测结果并标注波动。
+- dashboard 优化主要减少数据库往返；冷启动仍受 DB/缓存影响。
+- 该结果为 18 车小数据，不是生产容量承诺。
