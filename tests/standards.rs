@@ -28,8 +28,15 @@ async fn standards_capabilities_are_honest() {
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["jt_t_809_2019"]["envelope"], true);
-    assert_eq!(body["jt_t_809_2019"]["business_messages"], false);
-    assert_eq!(body["gb_t_32960_3_2025"]["business_data_units"], false);
+    assert_eq!(body["jt_t_809_2019"]["business_messages"], true);
+    assert_eq!(body["gb_t_32960_3_2025"]["business_data_units"], true);
+    assert_eq!(body["jt_t_808_2019"]["registration_full_fields"], true);
+    assert!(body["catalog_categories"]["local"].as_u64().unwrap_or(0) > 0);
+    assert!(body["catalog_categories"]["group"].as_u64().unwrap_or(0) > 0);
+    assert!(body["standards"]
+        .as_array()
+        .map(|items| !items.is_empty())
+        .unwrap_or(false));
     assert_eq!(body["jt_t_808_2019"]["query_all_parameters_0x8104"], true);
     assert_eq!(body["jt_t_808_2019"]["query_attributes_0x8107"], true);
     assert_eq!(body["jt_t_808_2019"]["text_downlink_0x8300"], true);

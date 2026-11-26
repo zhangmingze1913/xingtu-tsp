@@ -208,7 +208,7 @@ PostGIS 100万 nearby 14.6s（全量 count）
 ## 11. 测试策略
 
 ```text
-单元/协议：297 passed
+单元/协议：298 passed
 集成：32 passed
 真实容器：PG/PostGIS/MySQL/Redis/RustFS/TDengine/Vault/Iggy/Walrus/tsink
 K8s：kind smoke

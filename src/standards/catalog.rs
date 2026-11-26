@@ -8,6 +8,15 @@ use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
+pub enum StandardCategory {
+    National,
+    Industry,
+    Local,
+    Group,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Implementation {
     Done,
     Partial,
@@ -23,9 +32,10 @@ pub struct MessageSpec {
     pub name: &'static str,
     pub direction: &'static str,
     pub implementation: Implementation,
+    pub category: StandardCategory,
 }
 
-pub const CATALOG_VERSION: &str = "2026-11-23";
+pub const CATALOG_VERSION: &str = "2026-11-26";
 
 use Implementation::{Done, Missing, NotApplicable, Partial};
 
@@ -37,6 +47,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "frame",
         name: "转义/校验/BCD",
         direction: "both",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -45,6 +56,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0001/0x8001",
         name: "通用应答",
         direction: "both",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -53,6 +65,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0002",
         name: "心跳",
         direction: "t-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -61,6 +74,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0100",
         name: "终端注册（表 8）",
         direction: "t-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -69,6 +83,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0102",
         name: "终端鉴权",
         direction: "t-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -77,6 +92,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0104/0x0107/0x0108",
         name: "参数/属性/升级应答",
         direction: "t-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -85,6 +101,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0200",
         name: "位置汇报（基础位置 + 里程/油量/胎压/温度/IO/模拟量/扩展信号/网络 TLV）",
         direction: "t-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -93,6 +110,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0201",
         name: "位置查询应答",
         direction: "t-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -101,6 +119,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0301/0x0302/0x0303",
         name: "事件/提问/菜单应答",
         direction: "t-p",
+        category: StandardCategory::Industry,
         implementation: NotApplicable,
     },
     MessageSpec {
@@ -109,6 +128,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0400/0x0401",
         name: "运输行业监控/应答",
         direction: "both",
+        category: StandardCategory::Industry,
         implementation: NotApplicable,
     },
     MessageSpec {
@@ -117,6 +137,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0500",
         name: "车辆控制应答",
         direction: "t-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -125,6 +146,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0601/0x0602",
         name: "区域/路线查询应答",
         direction: "both",
+        category: StandardCategory::Industry,
         implementation: NotApplicable,
     },
     MessageSpec {
@@ -133,6 +155,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0700",
         name: "行驶记录上传封装",
         direction: "t-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -141,6 +164,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0701",
         name: "电子运单",
         direction: "t-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -149,6 +173,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0702",
         name: "驾驶员身份",
         direction: "t-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -157,6 +182,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0704",
         name: "批量位置（含补传类型/尾随校验）",
         direction: "t-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -165,6 +191,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0705",
         name: "CAN 总线数据",
         direction: "t-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -173,6 +200,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0800/0x0801",
         name: "多媒体事件/数据",
         direction: "t-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -181,6 +209,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0802",
         name: "多媒体检索应答（多条目 35 字节 + 扩展 TLV）",
         direction: "t-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -189,6 +218,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0805",
         name: "拍照应答",
         direction: "t-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -197,6 +227,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x8103/0x8104/0x8107",
         name: "参数设置/查询（含应答）",
         direction: "p-t",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -205,6 +236,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x8202/0x8203/0x8204",
         name: "跟踪/告警确认/链路检测",
         direction: "p-t",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -213,6 +245,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x8300",
         name: "文本信息（下行）",
         direction: "p-t",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -221,6 +254,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x8301-0x8304",
         name: "2011 遗留（2019 已移除）",
         direction: "p-t",
+        category: StandardCategory::Industry,
         implementation: NotApplicable,
     },
     MessageSpec {
@@ -229,6 +263,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x8400/0x8401",
         name: "电话回拨/设置电话本",
         direction: "p-t",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -237,6 +272,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x8402",
         name: "2019 不存在（2011 遗留）",
         direction: "p-t",
+        category: StandardCategory::Industry,
         implementation: NotApplicable,
     },
     MessageSpec {
@@ -245,6 +281,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x8500",
         name: "车辆控制（下行 + 0x0500）",
         direction: "p-t",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -253,6 +290,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x8600-0x8607",
         name: "圆形/矩形/多边形/路线设置删除",
         direction: "p-t",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -261,6 +299,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x8608/0x0608",
         name: "区域/路线查询及多块应答",
         direction: "both",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -269,6 +308,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x8700/0x0700",
         name: "行驶记录命令/上传（19056-2021 记录块）",
         direction: "both",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -277,6 +317,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x8702",
         name: "驾驶员身份请求",
         direction: "p-t",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -285,6 +326,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x8800/0x8801",
         name: "多媒体上传应答/立即拍摄",
         direction: "both",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -293,6 +335,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x8802-0x8805",
         name: "检索/上传/录音/单条上传",
         direction: "both",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -301,6 +344,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x8900/0x0900",
         name: "数据上下行透传",
         direction: "both",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -309,6 +353,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0901",
         name: "GZIP 数据压缩上报",
         direction: "t-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -317,6 +362,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x8A00/0x0A00",
         name: "平台/终端 RSA 公钥",
         direction: "both",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -325,6 +371,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "amendment-1",
         name: "第1号修改单（0x0205/0x0702）",
         direction: "both",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     // JT/T 809-2019
@@ -334,6 +381,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "frame",
         name: "30 字节头/转义/CRC32/加密",
         direction: "p-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -342,6 +390,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "login/logout",
         name: "登录/注销（表11/13）",
         direction: "p-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -350,6 +399,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "link",
         name: "链路保持/断开/关闭通知",
         direction: "p-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -358,6 +408,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x1200/0x9200",
         name: "动态信息交换（注册/位置/监控/补发/驾驶员/运单/线路）",
         direction: "both",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -366,6 +417,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x1300/0x9300",
         name: "平台间报文（0x1301–0x1303/0x9301–0x9303）",
         direction: "both",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -374,6 +426,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x1301/0x9301",
         name: "平台查岗",
         direction: "both",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -382,6 +435,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x1302",
         name: "平台间报文应答",
         direction: "p-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -390,6 +444,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x1303/0x9303",
         name: "平台间补传请求",
         direction: "both",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -398,6 +453,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x1400/0x9400",
         name: "报警信息交互（上报/结果/督办/预警/实时交换）",
         direction: "both",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -406,6 +462,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x1500/0x9500",
         name: "车辆监管请求/应答（含拍照）",
         direction: "both",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -414,6 +471,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x1600/0x9600",
         name: "静态信息交换（补报/应答/路线/表91）",
         direction: "both",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -422,6 +480,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "sequence",
         name: "按子业务序列号/缺口检测",
         direction: "p-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -430,6 +489,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "amendment-1",
         name: "驾驶员身份证/人脸匹配度（表34/36）",
         direction: "p-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     // GB/T 32960.3-2025
@@ -439,6 +499,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "header",
         name: "$$/## + BCC + VIN",
         direction: "v-p",
+        category: StandardCategory::National,
         implementation: Done,
     },
     MessageSpec {
@@ -447,6 +508,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x01",
         name: "车辆登入（2016/2025）",
         direction: "v-p",
+        category: StandardCategory::National,
         implementation: Done,
     },
     MessageSpec {
@@ -455,6 +517,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x02/0x03",
         name: "实时/补发信息体（全 section 访问/顺序/重复校验）",
         direction: "v-p",
+        category: StandardCategory::National,
         implementation: Done,
     },
     MessageSpec {
@@ -463,6 +526,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x04",
         name: "车辆登出",
         direction: "v-p",
+        category: StandardCategory::National,
         implementation: Done,
     },
     MessageSpec {
@@ -471,6 +535,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x05/0x06",
         name: "平台登入/登出",
         direction: "p-v",
+        category: StandardCategory::National,
         implementation: Done,
     },
     MessageSpec {
@@ -479,6 +544,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x07",
         name: "心跳",
         direction: "v-p",
+        category: StandardCategory::National,
         implementation: Done,
     },
     MessageSpec {
@@ -487,6 +553,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x08",
         name: "校时（6 字节 BCD）",
         direction: "p-v",
+        category: StandardCategory::National,
         implementation: Done,
     },
     MessageSpec {
@@ -495,6 +562,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x0B",
         name: "数据单元密钥交换",
         direction: "both",
+        category: StandardCategory::National,
         implementation: Done,
     },
     MessageSpec {
@@ -503,6 +571,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x06",
         name: "报警等级 0-4 + N5",
         direction: "v-p",
+        category: StandardCategory::National,
         implementation: Done,
     },
     MessageSpec {
@@ -511,6 +580,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x07/0x08",
         name: "最小并联单元电压/温度",
         direction: "v-p",
+        category: StandardCategory::National,
         implementation: Done,
     },
     MessageSpec {
@@ -519,6 +589,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "0x30/0x31/0x32",
         name: "电堆/超级电容/极值",
         direction: "v-p",
+        category: StandardCategory::National,
         implementation: Done,
     },
     MessageSpec {
@@ -527,6 +598,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "signature",
         name: "RSA/SM2/ECDSA 签名结构",
         direction: "v-p",
+        category: StandardCategory::National,
         implementation: Done,
     },
     MessageSpec {
@@ -535,6 +607,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "activation",
         name: "激活信息/结果",
         direction: "both",
+        category: StandardCategory::National,
         implementation: Done,
     },
     MessageSpec {
@@ -543,6 +616,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "crypto",
         name: "RSA/AES/SM4/SM2/ECDSA 原语",
         direction: "both",
+        category: StandardCategory::National,
         implementation: Done,
     },
     MessageSpec {
@@ -551,6 +625,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "1h-monitor",
         name: "下高压后 1h 监测状态机",
         direction: "v-p",
+        category: StandardCategory::National,
         implementation: Done,
     },
     MessageSpec {
@@ -559,6 +634,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "encrypted-frame",
         name: "密文帧解密接入（BCC 后解密）",
         direction: "v-p",
+        category: StandardCategory::National,
         implementation: Done,
     },
     MessageSpec {
@@ -568,6 +644,7 @@ pub const CATALOG: &[MessageSpec] = &[
         name:
             "端到端接收/入库（HTTP + TCP/TLS + VIN/白名单/注册表/管理 API/限流，含 TCP→轨迹测试）",
         direction: "v-p",
+        category: StandardCategory::National,
         implementation: Done,
     },
     // JT/T 1078 / 1077
@@ -577,6 +654,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "media",
         name: "媒体包（编解码/重排/组装/H264/AAC/弱网统计；真实流联调跳过）",
         direction: "d-p",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -585,6 +663,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "signals",
         name: "1078 信令（实时/回放/资源/上传完成/上传指令）",
         direction: "p-d",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -593,6 +672,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "playback",
         name: "回放（fMP4 remux + MSE 播放器 + 会话/样本接口）",
         direction: "p-d",
+        category: StandardCategory::Industry,
         implementation: Done,
     },
     MessageSpec {
@@ -601,6 +681,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "platform",
         name: "视频平台技术要求",
         direction: "n/a",
+        category: StandardCategory::Industry,
         implementation: Partial,
     },
     // Supporting standards
@@ -610,6 +691,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "tachograph",
         name: "行驶记录（2021 记录块/启动块/文件摘要 + 2012 命令帧）",
         direction: "d-p",
+        category: StandardCategory::National,
         implementation: Done,
     },
     MessageSpec {
@@ -618,6 +700,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "platform",
         name: "平台技术要求",
         direction: "n/a",
+        category: StandardCategory::Industry,
         implementation: Partial,
     },
     MessageSpec {
@@ -626,6 +709,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "platform",
         name: "平台技术要求",
         direction: "n/a",
+        category: StandardCategory::National,
         implementation: Partial,
     },
     MessageSpec {
@@ -634,6 +718,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "mlps",
         name: "等保 2.0",
         direction: "n/a",
+        category: StandardCategory::National,
         implementation: Partial,
     },
     MessageSpec {
@@ -642,6 +727,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "auto_data",
         name: "汽车数据安全",
         direction: "n/a",
+        category: StandardCategory::National,
         implementation: Partial,
     },
     MessageSpec {
@@ -650,6 +736,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "pii",
         name: "个人信息安全",
         direction: "n/a",
+        category: StandardCategory::National,
         implementation: Partial,
     },
     MessageSpec {
@@ -658,6 +745,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "crypto",
         name: "密码应用要求",
         direction: "n/a",
+        category: StandardCategory::National,
         implementation: Partial,
     },
     MessageSpec {
@@ -666,6 +754,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "ev-security",
         name: "电动汽车远程服务信息安全",
         direction: "n/a",
+        category: StandardCategory::National,
         implementation: Partial,
     },
     MessageSpec {
@@ -674,6 +763,7 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "local",
         name: "DB31/T 1409.1/.2/.3-2023（2026-07-08 全部废止）",
         direction: "n/a",
+        category: StandardCategory::Local,
         implementation: NotApplicable,
     },
     MessageSpec {
@@ -682,9 +772,128 @@ pub const CATALOG: &[MessageSpec] = &[
         message_id: "terminal",
         name: "终端技术要求（平台不生产终端）",
         direction: "n/a",
+        category: StandardCategory::Industry,
         implementation: NotApplicable,
     },
+    // National supporting standards (2025 editions)
+    MessageSpec {
+        standard: "GB/T 32960.1",
+        version: "2025",
+        message_id: "general",
+        name: "电动汽车远程服务与管理系统 第1部分：总则（2025）",
+        direction: "n/a",
+        implementation: Partial,
+        category: StandardCategory::National,
+    },
+    MessageSpec {
+        standard: "GB/T 32960.2",
+        version: "2025",
+        message_id: "terminal",
+        name: "第2部分：车载终端（2025，平台不生产终端）",
+        direction: "n/a",
+        implementation: NotApplicable,
+        category: StandardCategory::National,
+    },
+    MessageSpec {
+        standard: "GB/T 32960.4",
+        version: "2025",
+        message_id: "consistency",
+        name: "第4部分：一致性测试（2025）",
+        direction: "n/a",
+        implementation: Partial,
+        category: StandardCategory::National,
+    },
+    // Local standards
+    MessageSpec {
+        standard: "DB31/T 1409.2",
+        version: "2023（已废止）",
+        message_id: "terminal",
+        name: "上海道路运输车辆智能视频监控 第2部分：车载终端",
+        direction: "n/a",
+        implementation: NotApplicable,
+        category: StandardCategory::Local,
+    },
+    MessageSpec {
+        standard: "DB31/T 1409.3",
+        version: "2023（已废止）",
+        message_id: "protocol",
+        name: "上海道路运输车辆智能视频监控 第3部分：通讯协议",
+        direction: "n/a",
+        implementation: NotApplicable,
+        category: StandardCategory::Local,
+    },
+    MessageSpec {
+        standard: "DB31/T 1561",
+        version: "2025",
+        message_id: "security",
+        name: "上海车联网服务平台网络安全技术要求",
+        direction: "n/a",
+        implementation: Partial,
+        category: StandardCategory::Local,
+    },
+    MessageSpec {
+        standard: "DB34/T 2690",
+        version: "2026",
+        message_id: "platform",
+        name: "安徽道路运输车辆卫星定位系统 平台技术要求与测试规范",
+        direction: "n/a",
+        implementation: Partial,
+        category: StandardCategory::Local,
+    },
+    MessageSpec {
+        standard: "DB34/T 2691",
+        version: "2016",
+        message_id: "provider",
+        name: "安徽卫星定位系统服务商通用能力要求",
+        direction: "n/a",
+        implementation: Partial,
+        category: StandardCategory::Local,
+    },
+    MessageSpec {
+        standard: "DB34/T 2692",
+        version: "2016",
+        message_id: "terminal",
+        name: "安徽车载终端技术要求与测试规范",
+        direction: "n/a",
+        implementation: NotApplicable,
+        category: StandardCategory::Local,
+    },
+    MessageSpec {
+        standard: "DB11/T 061",
+        version: "2011",
+        message_id: "dangerous-goods",
+        name: "北京危险货物道路运输车辆技术要求",
+        direction: "n/a",
+        implementation: NotApplicable,
+        category: StandardCategory::Local,
+    },
+    // Group standards
+    MessageSpec {
+        standard: "T/ITS 0310",
+        version: "2025",
+        message_id: "evidence",
+        name: "省际客运车辆卫星定位装置不在线违法行为智能取证",
+        direction: "n/a",
+        implementation: Partial,
+        category: StandardCategory::Group,
+    },
 ];
+
+pub fn category_counts() -> (usize, usize, usize, usize) {
+    let mut national = 0;
+    let mut industry = 0;
+    let mut local = 0;
+    let mut group = 0;
+    for spec in CATALOG {
+        match spec.category {
+            StandardCategory::National => national += 1,
+            StandardCategory::Industry => industry += 1,
+            StandardCategory::Local => local += 1,
+            StandardCategory::Group => group += 1,
+        }
+    }
+    (national, industry, local, group)
+}
 
 pub fn counts() -> (usize, usize, usize, usize) {
     let mut done = 0;
@@ -716,5 +925,24 @@ mod tests {
         assert_eq!(done + partial + missing + na, CATALOG.len());
         assert!(done > 0 && partial > 0);
         assert_eq!(missing, 0);
+        let (national, industry, local, group) = category_counts();
+        assert!(national > 0 && industry > 0 && local > 0 && group > 0);
+        assert_eq!(national + industry + local + group, CATALOG.len());
+    }
+
+    #[test]
+    fn catalog_records_current_local_and_group_editions() {
+        assert!(CATALOG
+            .iter()
+            .any(|spec| spec.standard == "DB34/T 2690" && spec.version == "2026"));
+        assert!(CATALOG
+            .iter()
+            .any(|spec| spec.standard == "DB31/T 1561" && spec.version == "2025"));
+        assert!(CATALOG
+            .iter()
+            .any(|spec| spec.standard == "T/ITS 0310" && spec.version == "2025"));
+        assert!(CATALOG
+            .iter()
+            .any(|spec| spec.standard == "GB/T 32960" && spec.version == "32960.3-2025"));
     }
 }

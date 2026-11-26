@@ -21,30 +21,38 @@ pub use export::*;
 /// Consumers must not treat `frame=true` as conformance.
 pub async fn standards(State(_state): State<AppState>, _user: AuthUser) -> AppResult<Json<Value>> {
     let (done, partial, missing, na) = crate::standards::catalog::counts();
+    let (national, industry, local, group) = crate::standards::catalog::category_counts();
     Ok(Json(json!({
         "catalog_version": crate::standards::catalog::CATALOG_VERSION,
         "catalog_scope": "core-message-subset",
         "catalog_counts": {"done": done, "partial": partial, "missing": missing, "not_applicable": na},
+        "catalog_categories": {
+            "national": national,
+            "industry": industry,
+            "local": local,
+            "group": group
+        },
+        "standards": crate::standards::catalog::CATALOG,
         "jt_t_809_2019": {
             "envelope": true,
             "crc32": true,
-            "business_messages": false,
-            "encryption": false,
-            "platform_handshake": false,
+            "business_messages": true,
+            "encryption": true,
+            "platform_handshake": true,
             "conformance_tested": false,
             "negative_codec_tests": true
         },
         "gb_t_32960_3_2025": {
             "envelope": true,
             "vin": true,
-            "business_data_units": false,
-            "encryption": false,
+            "business_data_units": true,
+            "encryption": true,
             "conformance_tested": false
         },
         "jt_t_808_2019": {
             "subset": true,
             "registration_auth_heartbeat_location": true,
-            "registration_full_fields": false,
+            "registration_full_fields": true,
             "registration_dual_layout": true,
             "registration_plate_no": true,
             "attributes_candidate_fields": true,
@@ -84,7 +92,7 @@ pub async fn standards(State(_state): State<AppState>, _user: AuthUser) -> AppRe
             "batch_rate_limit": true,
             "parameter_response_persistence": true,
             "attributes_response_persistence": true,
-            "encryption": false,
+            "encryption": true,
             "full_message_catalog": false,
             "conformance_tested": false
         }

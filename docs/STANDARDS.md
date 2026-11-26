@@ -1,3 +1,5 @@
+> **2026-11-26 最新评估：** 本页部分标准版本/状态已过时，请以 [STANDARDS_ASSESSMENT_2026-11-26.md](STANDARDS_ASSESSMENT_2026-11-26.md) 和 `src/standards/catalog.rs` 为准。
+
 > **2026-11-18 review notice:** this page is an earlier standards matrix and contains stale statuses (for example 0x0201 and TLS/RS256 are now implemented). The authoritative gap matrix and implementation roadmap is [STANDARDS_ROADMAP.md](STANDARDS_ROADMAP.md).
 
 # 车联网 TSP 标准符合性矩阵

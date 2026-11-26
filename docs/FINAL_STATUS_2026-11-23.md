@@ -386,7 +386,7 @@ tdengine::tests::rest_query_maps_rows_to_points
 验证基线：
 
 ```text
-lib                    297 passed
+lib                    298 passed
 integration            32 passed
 fmt                    clean
 clippy --all-targets   clean

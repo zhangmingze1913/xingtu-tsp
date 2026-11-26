@@ -45,7 +45,8 @@ TIMESERIES_BACKENDS.md     TDengine 选型
 TIMESERIES_OPERATIONS.md   TDengine 运维
 RUSTFS.md                  录制/归档存储
 INTEGRATIONS.md            外部集成
-STANDARDS.md               标准实现边界
+STANDARDS_ASSESSMENT_2026-11-26.md  最新标准评估（权威）
+STANDARDS.md               标准实现边界（部分过时）
 SIMULATION_SCOPE.md        模拟器范围
 ```
 
@@ -66,7 +67,7 @@ STANDARDS_REASSESSMENT_2026-11-21.md
 
 | 项目 | 状态 |
 | --- | --- |
-| 单元/协议测试 | 297 passed |
+| 单元/协议测试 | 298 passed |
 | 集成测试 | 32 passed |
 | fmt / clippy | clean |
 | PostgreSQL 真实连接 | 已验证（PostGIS 16-3.4 容器） |
