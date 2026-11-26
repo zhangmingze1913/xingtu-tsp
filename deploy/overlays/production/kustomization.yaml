@@ -1,0 +1,57 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: xingtu-tsp
+
+# Base development manifests. This overlay is intentionally explicit: it does
+# not invent managed Redis/PostgreSQL endpoints or PII/export keys.
+resources:
+  - ../../k8s
+
+patches:
+  - target:
+      kind: ConfigMap
+      name: tsp-config
+    patch: |-
+      - op: replace
+        path: /data/TSP_ENV
+        value: production
+      - op: replace
+        path: /data/TSP_DEMO_MODE
+        value: "false"
+      - op: replace
+        path: /data/TSP_COMMAND_MODE
+        value: jt808
+      - op: add
+        path: /data/TSP_EXPORT_REQUIRE_ENCRYPTION
+        value: "true"
+      # Replace with the managed Redis TLS endpoint for the target environment.
+      - op: replace
+        path: /data/TSP_REDIS_URL
+        value: rediss://managed-redis.example.invalid:6379/0
+      # Set to the customer's HTTPS origins before apply.
+      - op: replace
+        path: /data/TSP_CORS_ORIGINS
+        value: https://console.example.invalid
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: tsp-api
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: TSP_PII_KEY
+          valueFrom:
+            secretKeyRef:
+              name: tsp-secret
+              key: pii-key
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: TSP_EXPORT_ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: tsp-secret
+              key: export-key

@@ -94,6 +94,16 @@ deploy/k8s/
   kustomization.yaml
 ```
 
+生产 overlay：
+
+```bash
+kubectl kustomize deploy/overlays/production
+```
+
+它切换 `TSP_ENV=production`、关闭 demo/模拟远控、强制 PII/导出加密，并保留
+Redis TLS/CORS 占位。Secret 必须额外提供 `pii-key`/`export-key`，详见
+`deploy/overlays/production/README.md`。
+
 完整链路 smoke：
 
 - [KUBERNETES_SMOKE.md](KUBERNETES_SMOKE.md)
