@@ -3,6 +3,7 @@
 //! These are protocol-shape tests, not certification. They make the current
 //! codec seams fail loudly instead of silently accepting corrupt frames.
 
+use xingtu_tsp::jt808::codec;
 use xingtu_tsp::standards::{gb32960, jt809};
 
 #[test]
@@ -83,4 +84,42 @@ fn static_frame_fixtures_decode() {
     assert_eq!(frame.command, gb32960::GB32960_REALTIME);
     assert_eq!(frame.vin, "LSVAA123456789012");
     assert_eq!(frame.data.len(), 20);
+}
+
+#[test]
+fn jt808_body_fixtures_decode_fields() {
+    let registration = decode_hex(include_str!("fixtures/standards/jt808_0100_2019.hex"));
+    let parsed = codec::parse_registration(&registration).expect("registration fields");
+    assert!(!parsed.manufacturer.is_empty());
+    assert!(!parsed.model.is_empty());
+
+    let attributes = decode_hex(include_str!("fixtures/standards/jt808_0107_2019.hex"));
+    let parsed = codec::parse_terminal_attributes(&attributes).expect("attribute fields");
+    assert!(!parsed.raw_hex.is_empty());
+
+    let location = decode_hex(include_str!("fixtures/standards/jt808_0200_mandatory.hex"));
+    let parsed = codec::parse_location(&location).expect("location fields");
+    assert!(parsed.lat.abs() > 1.0 && parsed.lon.abs() > 1.0);
+
+    let alarm_ack = decode_hex(include_str!("fixtures/standards/jt808_8203.hex"));
+    assert!(alarm_ack.len() >= 2);
+}
+
+#[test]
+fn jt808_truncated_bodies_are_rejected() {
+    let location = decode_hex(include_str!("fixtures/standards/jt808_0200_mandatory.hex"));
+    for cut in [1usize, 4, 10, 27] {
+        assert!(
+            codec::parse_location(&location[..cut]).is_err(),
+            "cut={cut}"
+        );
+    }
+}
+
+#[test]
+fn jt808_truncated_frames_are_rejected() {
+    let raw = decode_hex(include_str!("fixtures/standards/jt808_0200_mandatory.hex"));
+    for cut in [1usize, 10, raw.len() / 2, raw.len().saturating_sub(1)] {
+        assert!(codec::parse_frame(&raw[..cut]).is_err(), "cut={cut}");
+    }
 }
