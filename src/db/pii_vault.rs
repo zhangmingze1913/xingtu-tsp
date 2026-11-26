@@ -114,6 +114,29 @@ impl Db {
         Ok(out)
     }
 
+    /// Erase driver PII for a vehicle and clear the denormalized columns.
+    /// This implements the GB/T 35273/41871 deletion control at the storage
+    /// boundary; backups/retention copies remain an operator responsibility.
+    pub async fn erase_vehicle_pii(&self, vehicle_id: &str) -> AppResult<u64> {
+        let mut tx = self.pool().begin().await?;
+        let deleted = self
+            .query(
+                "DELETE FROM pii_vault
+                 WHERE owner_type = 'vehicle' AND owner_id = ?1
+                   AND field IN ('driver_phone', 'driver_name')",
+            )
+            .bind(vehicle_id)
+            .execute(&mut tx)
+            .await?
+            .rows_affected();
+        self.query("UPDATE vehicles SET driver_phone = '', driver_name = '' WHERE id = ?1")
+            .bind(vehicle_id)
+            .execute(&mut tx)
+            .await?;
+        tx.commit().await?;
+        Ok(deleted)
+    }
+
     pub async fn delete_pii(
         &self,
         owner_type: &str,

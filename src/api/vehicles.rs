@@ -288,6 +288,29 @@ pub async fn delete(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Admin-only data-subject deletion for vehicle driver PII.
+pub async fn erase_pii(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<String>,
+) -> AppResult<Json<serde_json::Value>> {
+    user.require_admin()?;
+    let deleted = state.db.erase_vehicle_pii(&id).await?;
+    state
+        .db
+        .audit(
+            Some(&user.id),
+            Some(&user.username),
+            "vehicle.pii.delete",
+            &id,
+            "删除车辆驾驶员 PII",
+        )
+        .await?;
+    Ok(Json(
+        serde_json::json!({"vehicle_id": id, "deleted": deleted}),
+    ))
+}
+
 pub async fn trips(
     State(state): State<AppState>,
     user: AuthUser,

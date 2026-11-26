@@ -26,6 +26,19 @@ suggested fix (optional)
 
 Do not include real customer data, production keys or terminal credentials.
 
+## Data subject deletion
+
+Admin-only endpoint:
+
+```http
+DELETE /api/vehicles/{id}/pii
+Authorization: Bearer <admin_token>
+```
+
+It deletes `driver_phone`/`driver_name` rows from `pii_vault`, clears the
+denormalized vehicle columns and writes an audit entry. Backups, replicas and
+导出副本 are operator responsibilities and are not erased by this endpoint.
+
 ## Default credentials
 
 The demo seed contains documented development credentials:

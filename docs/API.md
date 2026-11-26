@@ -574,3 +574,13 @@ GET /integrations/timeseries/reconciliations/export?vehicle_id=...&org_name=...&
 - 最多 5000 行，500 行/页 keyset 流式输出
 - CSV 列：id/vehicle_id/org_name/from_ts/to_ts/pg_count/td_count/count_delta/consistent/checked_at
 
+
+
+## 车辆驾驶员 PII 删除
+
+```http
+DELETE /api/vehicles/{id}/pii
+Authorization: Bearer <admin token>
+```
+
+仅管理员可用。删除 `pii_vault` 中 `driver_phone`/`driver_name`，清空车辆冗余字段，并写审计。备份/副本不在此接口范围内。

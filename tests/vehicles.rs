@@ -680,3 +680,49 @@ async fn gb32960_device_registry_admin_flow() {
     assert_eq!(status, StatusCode::OK, "disable failed: {body}");
     assert_eq!(body["enabled"], false);
 }
+
+#[tokio::test]
+async fn pii_deletion_endpoint_clears_driver_fields() {
+    let (app, _state) = setup().await;
+    let token = login(&app).await;
+    let (status, body) = request(
+        &app,
+        Method::POST,
+        "/api/vehicles",
+        Some(&token),
+        Some(json!({
+            "vin": "LSVAA2A41NX999998",
+            "plate_no": "娌狝路PII998",
+            "model": "PII",
+            "color": "white",
+            "energy_type": "EV",
+            "driver_name": "PII Driver",
+            "driver_phone": "13600000000",
+            "org_name": "PIIOrg"
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "create: {body}");
+    let id = body["id"].as_str().expect("id");
+    let (status, body) = request(
+        &app,
+        Method::DELETE,
+        &format!("/api/vehicles/{id}/pii"),
+        Some(&token),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "erase: {body}");
+    assert_eq!(body["deleted"], 0);
+    let (status, body) = request(
+        &app,
+        Method::GET,
+        &format!("/api/vehicles/{id}"),
+        Some(&token),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["driver_name"], "");
+    assert_eq!(body["driver_phone"], "");
+}

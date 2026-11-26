@@ -109,3 +109,39 @@ async fn terminal_auth_code_is_vaulted_and_verifiable() {
 
     std::env::remove_var("TSP_PII_KEY");
 }
+
+#[tokio::test]
+async fn vehicle_pii_erase_removes_vault_and_columns() {
+    std::env::set_var("TSP_PII_KEY", KEY);
+    let db = Db::in_memory().await.expect("db");
+    let vehicle = db
+        .create_vehicle(CreateVehicleRequest {
+            vin: "LSVAA2A41NX999991".to_string(),
+            plate_no: "娌狝99991".to_string(),
+            model: "EraseTest".to_string(),
+            color: "white".to_string(),
+            energy_type: "EV".to_string(),
+            driver_name: "Erase Driver".to_string(),
+            driver_phone: "13600136000".to_string(),
+            org_name: "EraseOrg".to_string(),
+        })
+        .await
+        .expect("vehicle");
+    let deleted = db
+        .erase_vehicle_pii(&vehicle.vehicle.id)
+        .await
+        .expect("erase");
+    assert_eq!(deleted, 2);
+    assert!(db
+        .get_pii("vehicle", &vehicle.vehicle.id, "driver_phone")
+        .await
+        .expect("read")
+        .is_none());
+    let cleared = db
+        .get_vehicle(&vehicle.vehicle.id)
+        .await
+        .expect("get")
+        .expect("vehicle");
+    assert_eq!(cleared.vehicle.driver_phone, "");
+    assert_eq!(cleared.vehicle.driver_name, "");
+}

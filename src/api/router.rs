@@ -47,6 +47,10 @@ pub fn build_router(state: AppState) -> Router {
             "/vehicles/{id}/commands",
             get(commands::list_commands).post(commands::create_command),
         )
+        .route(
+            "/vehicles/{id}/pii",
+            axum::routing::delete(vehicles::erase_pii),
+        )
         .route("/vehicles/{id}/terminal", post(vehicles::bind_terminal))
         .route("/telemetry", post(telemetry::ingest))
         .route("/gb32960/ingest", post(gb32960::ingest_frame))
