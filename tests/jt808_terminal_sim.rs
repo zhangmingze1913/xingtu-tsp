@@ -47,6 +47,17 @@ fn registration_body() -> Vec<u8> {
     body
 }
 
+fn batch_body(items: &[Vec<u8>]) -> Vec<u8> {
+    let mut body = Vec::new();
+    body.extend_from_slice(&(items.len() as u16).to_be_bytes());
+    body.push(0); // normal batch
+    for item in items {
+        body.extend_from_slice(&(item.len() as u16).to_be_bytes());
+        body.extend_from_slice(item);
+    }
+    body
+}
+
 async fn send_and_receive(stream: &mut TcpStream, raw: Vec<u8>) -> Frame {
     stream.write_all(&raw).await.expect("write");
     read_frame(stream).await
@@ -137,6 +148,54 @@ async fn simulated_terminal_register_auth_heartbeat_location_reconnect() {
             .expect("count telemetry"),
         1,
         "duplicate location inserted twice"
+    );
+
+    // 0x0704 batch: three chronological points, one transaction.
+    let batch = batch_body(&[
+        jt808::codec::encode_location_response(
+            31.2304,
+            121.4737,
+            20.0,
+            90.0,
+            true,
+            "2026-11-26T15:01:00+08:00",
+        ),
+        jt808::codec::encode_location_response(
+            31.2305,
+            121.4738,
+            21.0,
+            91.0,
+            true,
+            "2026-11-26T15:01:01+08:00",
+        ),
+        jt808::codec::encode_location_response(
+            31.2306,
+            121.4739,
+            22.0,
+            92.0,
+            true,
+            "2026-11-26T15:01:02+08:00",
+        ),
+    ]);
+    let raw = build_frame(jt808::MSG_LOCATION_BATCH, PHONE, 6, &batch).expect("batch frame");
+    let response = send_and_receive(&mut stream, raw).await;
+    assert_eq!(response.body[2], 0, "batch rejected");
+    assert_eq!(
+        db.count_telemetry_for(&vehicle.vehicle.id)
+            .await
+            .expect("batch count"),
+        4
+    );
+
+    // Retransmitted batch must not duplicate the three points.
+    let raw = build_frame(jt808::MSG_LOCATION_BATCH, PHONE, 7, &batch).expect("batch dup");
+    let response = send_and_receive(&mut stream, raw).await;
+    assert_eq!(response.body[2], 0, "duplicate batch rejected");
+    assert_eq!(
+        db.count_telemetry_for(&vehicle.vehicle.id)
+            .await
+            .expect("duplicate batch count"),
+        4
     );
 
     drop(stream);
