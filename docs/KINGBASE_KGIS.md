@@ -182,3 +182,23 @@ cargo test --lib kingbase_connection_smoke
 [ ] schema_migrations 含 0007_kgis_geometry
 [ ] 与 PostgreSQL 结果抽样对比
 ```
+
+
+## 6. Health observability
+
+`/api/health` and `/api/ready` now expose:
+
+```json
+{"database_engine":"kingbase","spatial_backend":"kgis"}
+```
+
+Values:
+
+```text
+postgis           PostgreSQL with geometry enabled
+kgis              Kingbase with geometry/KGIS-compatible extension
+lat_lon_fallback  no spatial extension; bbox/nearby use lat/lon
+```
+
+This is observability only. A `kgis` value requires the real KGIS extension;
+it does not mean KGIS conformance or license.

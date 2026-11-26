@@ -2,6 +2,16 @@ use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
 
 use crate::{models::HealthResponse, state::AppState, util::now_iso};
 
+fn spatial_backend(state: &AppState) -> &'static str {
+    if !state.db.postgis_enabled() {
+        "lat_lon_fallback"
+    } else if state.db.engine_name() == "kingbase" {
+        "kgis"
+    } else {
+        "postgis"
+    }
+}
+
 pub(crate) async fn health(State(state): State<AppState>) -> impl IntoResponse {
     let database = state.db.ping().await.is_ok();
     let cluster = state.cluster.status();
@@ -15,6 +25,7 @@ pub(crate) async fn health(State(state): State<AppState>) -> impl IntoResponse {
         version: env!("CARGO_PKG_VERSION"),
         database,
         database_engine: state.db.engine_name().to_string(),
+        spatial_backend: spatial_backend(&state),
         cluster_enabled: cluster.enabled,
         cluster_leader: cluster.leader,
         timeseries_backend: state.config.timeseries_backend.as_str().to_string(),
@@ -54,6 +65,7 @@ pub(crate) async fn ready(State(state): State<AppState>) -> impl IntoResponse {
             "cluster_enabled": cluster.enabled,
             "cluster_leader": cluster.leader,
             "database_engine": state.db.engine_name(),
+            "spatial_backend": spatial_backend(&state),
             "timeseries_backend": state.config.timeseries_backend.as_str(),
             "tdengine": state.tdengine.is_some(),
             "tdengine_ready": tdengine_ready,

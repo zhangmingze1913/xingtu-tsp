@@ -584,3 +584,14 @@ Authorization: Bearer <admin token>
 ```
 
 仅管理员可用。删除 `pii_vault` 中 `driver_phone`/`driver_name`，清空车辆冗余字段，并写审计。备份/副本不在此接口范围内。
+
+
+## 健康/就绪空间能力
+
+`GET /api/health`、`GET /api/ready` 新增：
+
+```json
+"spatial_backend": "postgis | kgis | lat_lon_fallback"
+```
+
+`kgis` 仅表示 Kingbase 上启用了 KGIS/PostGIS 兼容扩展，不代表 KGIS 合规或授权。
