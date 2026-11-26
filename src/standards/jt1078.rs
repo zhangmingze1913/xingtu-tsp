@@ -916,7 +916,13 @@ impl Jt1078StreamPipeline {
         }
         stream.insert(packet.sequence, packet);
         let mut frames = Vec::new();
+        let mut iterations = 0usize;
         loop {
+            iterations += 1;
+            if iterations > self.max_packets + self.max_gap + 4 {
+                tracing::error!(?key, expected, iterations, "JT1078 pipeline loop guard");
+                break;
+            }
             let mut stream = self.pending.remove(&key).unwrap_or_default();
             if let Some(packet) = stream.remove(&expected) {
                 if let Some(frame) = self.assembler.push(&packet) {
@@ -933,7 +939,10 @@ impl Jt1078StreamPipeline {
             if stream.len() > self.max_gap {
                 if let Some((&next, _)) = stream.iter().next() {
                     self.stats.gaps_skipped += 1;
-                    self.expected.insert(key, next);
+                    // Advance the local cursor too; only updating the map
+                    // would re-enter this branch forever.
+                    expected = next;
+                    self.expected.insert(key, expected);
                     self.pending.insert(key, stream);
                     continue;
                 }

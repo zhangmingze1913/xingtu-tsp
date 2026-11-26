@@ -33,7 +33,7 @@
 | `jt809_sim.rs` | 真实 TCP mock 平台 | 登录、报警、ACK、重连 | 真实监管平台/TLS 认证 |
 | `jt809_tls_sim.rs` | TLS mock | 证书链路/登录 | 生产 CA/双向认证 |
 | `gb32960_sim.rs` | 命令/数据单元 | 登录/实时/补发/登出/报警/电池/签名/激活/1h 监控 | 官方测试集 |
-| `jt1078_sim.rs` | 合成媒体 | 信令、RTP 包、H.264 重组 | 真实摄像头/弱网 |
+| `jt1078_sim.rs` | 合成媒体 | 信令、RTP 包、H.264 重组、乱序/重复/缺口 | 真实摄像头/弱网 |
 | `standards_conformance.rs` | 固定夹具/负向 | 808/809/1078/32960 帧 | 第三方一致性 |
 | `standards_fuzz.rs` | 随机输入 | 不 panic/不越界 | 语义正确性 |
 | `postgis_health.rs` | 真实 PostGIS（opt-in） | health/ready 的 postgis 分支 | KGIS 插件/License |

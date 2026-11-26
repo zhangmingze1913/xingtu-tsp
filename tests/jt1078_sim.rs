@@ -4,7 +4,7 @@
 use xingtu_tsp::jt808::codec::{build_frame, parse_frame};
 use xingtu_tsp::standards::jt1078::{
     Jt1078FrameAssembler, Jt1078H264Frame, Jt1078Packet, Jt1078RealtimeRequest,
-    MSG_REALTIME_REQUEST,
+    Jt1078StreamPipeline, MSG_REALTIME_REQUEST,
 };
 
 #[test]
@@ -57,4 +57,38 @@ fn simulated_9101_request_and_media_pipeline() {
     let parsed = Jt1078H264Frame::parse(&assembled).expect("h264");
     assert_eq!(parsed.nals.len(), 3);
     assert!(parsed.is_keyframe());
+}
+
+fn media_packet(sequence: u16, marker: bool, body: u8) -> Jt1078Packet {
+    Jt1078Packet {
+        flags: 0x80,
+        marker_payload: if marker { 0x80 } else { 0x00 },
+        sequence,
+        sim: [0x89, 0x86, 0x00, 0x12, 0x34, 0x56],
+        channel: 1,
+        data_type: 0,
+        timestamp: 1,
+        last_i_frame_interval: 0,
+        last_frame_interval: 0,
+        body: vec![body],
+    }
+}
+
+#[test]
+fn stream_pipeline_reorders_duplicates_and_skips_gaps() {
+    let mut pipeline = Jt1078StreamPipeline::new(16, 16, 2);
+    assert!(pipeline.push(media_packet(1, false, 1)).is_empty());
+    assert!(pipeline.push(media_packet(3, true, 3)).is_empty());
+    assert!(pipeline.push(media_packet(3, true, 3)).is_empty());
+    let frames = pipeline.push(media_packet(2, false, 2));
+    assert_eq!(frames, vec![vec![1, 2, 3]]);
+    assert_eq!(pipeline.stats().frames, 1);
+    assert_eq!(pipeline.stats().duplicates, 1);
+
+    let mut gap = Jt1078StreamPipeline::new(16, 16, 1);
+    assert!(gap.push(media_packet(5, false, 5)).is_empty());
+    assert!(gap.push(media_packet(7, false, 7)).is_empty());
+    let frames = gap.push(media_packet(8, true, 8));
+    assert_eq!(frames, vec![vec![5, 7, 8]]);
+    assert_eq!(gap.stats().gaps_skipped, 1);
 }
