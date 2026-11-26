@@ -24,6 +24,9 @@ ARCHITECTURE_DIAGRAMS.md               架构图集
 TECHNICAL_GUIDE.md                     技术文档
 OPERATIONS_GUIDE.md                    运维手册
 ARCHITECTURE.md                        架构文档
+BUSINESS_ARCHITECTURE.md               业务架构
+OPERATIONS_ARCHITECTURE.md             运维架构
+DEPLOYMENT_ARCHITECTURE.md             部署架构
 PERFORMANCE_EVALUATION_2026-11-25.md   本次性能评估
 RECOMMENDATIONS.md                     选型与使用建议
 DELIVERY_CHECKLIST.md                  交付/验收清单

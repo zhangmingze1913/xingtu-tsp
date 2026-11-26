@@ -86,7 +86,7 @@ api/integrations.rs
 | --- | ---: | --- | --- |
 | `standards/jt809.rs` | ~4.3k | 帧/加密/业务/测试集中 | 拆 `frame`/`crypto`/`business` |
 | `standards/gb32960.rs` | ~3.5k | 编解码与测试集中 | 拆 `codec`/`state`/`tests` |
-| `jt808/control.rs` | ~3.0k | 控制消息集中 | 按 0x8xxx 分组 |
+| `jt808/control.rs` + `control/media.rs` | 2658 + 327 | 媒体控制已拆出；其余控制仍集中 | 可按参数/事件/区域继续拆 |
 | `api/integrations/` | mod ~0.5k + export ~0.7k | 已拆出导出任务/令牌/告警 | 可继续拆 `reconcile` |
 | `tdengine.rs` + `tdengine/alert.rs` | 823 + 260 | 已拆出告警/冷却/签名；核心写入与查询仍在 | 可继续拆 client/writer/query |
 
