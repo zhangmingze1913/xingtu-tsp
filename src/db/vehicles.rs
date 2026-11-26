@@ -1,3 +1,10 @@
+//! Vehicle queries and PII hydration.
+//!
+//! List/detail reads return a vault marker in the denormalized columns. PII is
+//! hydrated in one batch query and one audit batch, not per row, so a 50-row
+//! page performs one vault read rather than 50. Keep that shape when adding
+//! fields.
+
 use sqlx::Row;
 
 use crate::{

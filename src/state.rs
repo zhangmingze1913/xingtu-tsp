@@ -82,6 +82,11 @@ impl TokenRevocations {
     }
 }
 
+/// Dashboard body cache with per-organization single-flight.
+///
+/// `entries` holds serialized JSON bodies (not models) so a cache hit can be
+/// returned without re-serialization. `inflight` coalesces a cold burst for
+/// one organization while leaving other organizations independent.
 pub(crate) struct DashboardCache {
     ttl: Duration,
     entries: RwLock<HashMap<String, (Instant, String)>>,

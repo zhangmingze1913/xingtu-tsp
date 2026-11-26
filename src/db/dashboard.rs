@@ -1,3 +1,15 @@
+//! Dashboard read model.
+//!
+//! Query budget per cold request is intentionally small:
+//! - one fleet/status aggregate
+//! - one alert/command aggregate
+//! - two seven-day range aggregates (mileage, alerts)
+//! - one recent-alert page
+//!
+//! The API layer adds a 2s cache plus per-organization single-flight, so a
+//! cold burst does not multiply this work. Keep new dashboard metrics inside
+//! these aggregates rather than adding per-day round-trips.
+
 use std::collections::HashMap;
 
 use crate::{
@@ -27,19 +39,22 @@ impl Db {
         let command_since = crate::util::iso_from_now_minutes(-60 * 24 * 7);
         let generated_at = now_iso();
 
-        let fleet_future = async {
+        // Fleet totals and status distribution in one grouped scan. The
+        // terminals join is safe because terminals.vehicle_id is UNIQUE.
+        let fleet_status_future = async {
             let sql = self.sql(
-                "SELECT COUNT(*),
-                        COALESCE(AVG(s.soc), 0),
+                "SELECT COALESCE(s.status, 'offline'), COUNT(*),
+                        COALESCE(SUM(s.soc), 0), COUNT(s.soc),
                         COALESCE(SUM(s.odometer_km), 0),
                         COUNT(t.vehicle_id),
                         COALESCE(SUM(CASE WHEN t.status = 'online' THEN 1 ELSE 0 END), 0)
                  FROM vehicles v
                  LEFT JOIN vehicle_state s ON s.vehicle_id = v.id
                  LEFT JOIN terminals t ON t.vehicle_id = v.id
-                 WHERE (?1 = '*' OR v.org_name = ?1)",
+                 WHERE (?1 = '*' OR v.org_name = ?1)
+                 GROUP BY COALESCE(s.status, 'offline')",
             );
-            self.query(&sql).bind(org).fetch_one(self.pool()).await
+            self.query(&sql).bind(org).fetch_all(self.pool()).await
         };
         let alert_command_future = async {
             let sql = self.sql(
@@ -73,23 +88,31 @@ impl Db {
                 .fetch_one(self.pool())
                 .await
         };
-        let status_future = async {
-            let sql = self.sql(
-                "SELECT COALESCE(s.status, 'offline'), COUNT(*) FROM vehicles v
-                 LEFT JOIN vehicle_state s ON s.vehicle_id = v.id
-                 WHERE (?1 = '*' OR v.org_name = ?1)
-                 GROUP BY 1",
-            );
-            self.query(&sql).bind(org).fetch_all(self.pool()).await
-        };
-        let (fleet_row, stats_row, rows) =
-            tokio::try_join!(fleet_future, alert_command_future, status_future)?;
+        let (rows, stats_row) = tokio::try_join!(fleet_status_future, alert_command_future)?;
 
-        let total = get_i64(&fleet_row, 0)?;
-        let avg_soc = get_f64(&fleet_row, 1)?;
-        let total_mileage = get_f64(&fleet_row, 2)?;
-        let terminal_total = get_i64(&fleet_row, 3)?;
-        let terminal_online = get_i64(&fleet_row, 4)?;
+        let mut total = 0i64;
+        let mut soc_sum = 0.0f64;
+        let mut soc_count = 0i64;
+        let mut total_mileage = 0.0f64;
+        let mut terminal_total = 0i64;
+        let mut terminal_online = 0i64;
+        let mut status_counts: HashMap<String, i64> = HashMap::new();
+        for row in &rows {
+            let status: String = row.try_get(0)?;
+            let count = get_i64(row, 1)?;
+            total += count;
+            soc_sum += get_f64(row, 2)?;
+            soc_count += get_i64(row, 3)?;
+            total_mileage += get_f64(row, 4)?;
+            terminal_total += get_i64(row, 5)?;
+            terminal_online += get_i64(row, 6)?;
+            status_counts.insert(status, count);
+        }
+        let avg_soc = if soc_count > 0 {
+            soc_sum / soc_count as f64
+        } else {
+            0.0
+        };
         let active_alerts = get_i64(&stats_row, 0)?;
         let critical = get_i64(&stats_row, 1)?;
         let warning = get_i64(&stats_row, 2)?;
@@ -97,12 +120,6 @@ impl Db {
         let commands_total = get_i64(&stats_row, 4)?;
         let commands_success = get_i64(&stats_row, 5)?;
 
-        let mut status_counts: HashMap<String, i64> = HashMap::new();
-        for row in &rows {
-            let status: String = row.try_get(0)?;
-            let count = get_i64(row, 1)?;
-            status_counts.insert(status, count);
-        }
         let get = |name: &str| *status_counts.get(name).unwrap_or(&0);
         let moving = get("moving");
         let idle = get("idle");
@@ -114,6 +131,8 @@ impl Db {
 
         // One scan per metric instead of 14 round-trips (7 days x 2
         // metrics). CASE ranges keep the exact China-day UTC boundaries.
+        // The SQL text is built once per request; bind positions are
+        // deterministic: ?1 = org, then (start,end) for each of the 7 days.
         let mut mileage_sql = String::from("SELECT ");
         for (index, _) in days.iter().enumerate() {
             if index > 0 {

@@ -241,6 +241,8 @@ bbox:   Bitmap Index Scan on idx_telemetry_geom
 
 优化：`src/db/dashboard.rs` 改为两条聚合 SQL，每条用 7 个 `CASE` 范围精确覆盖中国日边界。
 
+同一轮还把车辆汇总和状态分布从 2 次扫描合并为 1 次分组扫描（`fleet_status_future`），dashboard 冷路径从 5 条查询降为 4 条。
+
 ```text
 原：14 次往返
 新：2 次往返（mileage + alerts）
@@ -251,11 +253,14 @@ bbox:   Bitmap Index Scan on idx_telemetry_geom
 环境：KingbaseES V8R6，18 台 demo 车辆，release 构建。
 
 ```text
-车辆列表 100 次：avg 12.9 ms，p50 11.4 ms，p95 31.6 ms
-并发 10x10：100 请求 0.32 s，313.4 req/s，0 失败
-dashboard 冷：约 144–679 ms（KES/缓存冷启动波动）
-dashboard 热：p50 约 1.6–2.9 ms
+车辆列表 100 次：avg 12.9–18.1 ms，p50 9.8–11.4 ms，p95 22.2–31.6 ms
+并发 10x10 热测：100 请求 0.18–0.32 s，281.7–313.4 req/s，0 失败
+dashboard 预热后冷查询：18–159 ms
+dashboard 首次冷启动：1.2–2.8 s（KES/进程冷）
+dashboard 热：p50 1.6–4.6 ms
 ```
+
+首轮并发曾出现 6.4 req/s、1 失败、15.66 s 的异常；复测为 281.7–313.4 req/s、0 失败。异常与 KES/Docker 冷 IO 有关，未从报告中删除。
 
 说明：
 

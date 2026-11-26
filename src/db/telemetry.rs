@@ -1,3 +1,11 @@
+//! Telemetry ingestion and state transitions.
+//!
+//! A single 0x0200 point and a 0x0704 batch share `ingest_location_tx`; the
+//! batch path sorts chronologically and commits once. `claim` is true for
+//! batches so a retransmitted batch cannot insert the same (vehicle, ts)
+//! twice. Alert dedupe and trip/fence transitions stay in the same transaction
+//! as the point, trading per-point queries for exactly-once business state.
+
 use sqlx::{Any, Row, Transaction};
 
 use crate::{
