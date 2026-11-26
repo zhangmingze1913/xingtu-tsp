@@ -15,6 +15,27 @@ pub enum StandardCategory {
     Group,
 }
 
+impl StandardCategory {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::National => "national",
+            Self::Industry => "industry",
+            Self::Local => "local",
+            Self::Group => "group",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "national" => Some(Self::National),
+            "industry" => Some(Self::Industry),
+            "local" => Some(Self::Local),
+            "group" => Some(Self::Group),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Implementation {

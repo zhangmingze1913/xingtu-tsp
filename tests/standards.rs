@@ -41,4 +41,30 @@ async fn standards_capabilities_are_honest() {
     assert_eq!(body["jt_t_808_2019"]["query_attributes_0x8107"], true);
     assert_eq!(body["jt_t_808_2019"]["text_downlink_0x8300"], true);
     assert_eq!(body["jt_t_808_2019"]["conformance_tested"], false);
+
+    let (status, local) = request(
+        &app,
+        Method::GET,
+        "/api/integrations/standards?category=local",
+        Some(token),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(local["filtered_count"].as_u64().unwrap_or(0) > 0);
+    assert!(local["standards"]
+        .as_array()
+        .expect("local standards")
+        .iter()
+        .all(|spec| spec["category"] == "local"));
+
+    let (status, invalid) = request(
+        &app,
+        Method::GET,
+        "/api/integrations/standards?category=bogus",
+        Some(token),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{invalid}");
 }

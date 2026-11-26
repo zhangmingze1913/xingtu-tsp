@@ -595,3 +595,31 @@ Authorization: Bearer <admin token>
 ```
 
 `kgis` 仅表示 Kingbase 上启用了 KGIS/PostGIS 兼容扩展，不代表 KGIS 合规或授权。
+
+
+## 标准目录过滤
+
+```http
+GET /api/integrations/standards?category=local
+GET /api/integrations/standards?category=group
+GET /api/integrations/standards?implementation=partial
+```
+
+支持：
+
+```text
+category: national | industry | local | group
+implementation: done | partial | missing | not_applicable
+```
+
+响应新增：
+
+```json
+{
+  "catalog_filter": {"category": "local"},
+  "filtered_count": 7,
+  "standards": []
+}
+```
+
+未知 category/implementation 返回 400。

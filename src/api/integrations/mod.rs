@@ -19,7 +19,40 @@ pub use export::*;
 
 /// Advertises the honest level of standards support implemented by this build.
 /// Consumers must not treat `frame=true` as conformance.
-pub async fn standards(State(_state): State<AppState>, _user: AuthUser) -> AppResult<Json<Value>> {
+#[derive(Debug, Deserialize)]
+pub struct StandardsQuery {
+    pub category: Option<String>,
+    pub implementation: Option<String>,
+}
+
+pub async fn standards(
+    State(_state): State<AppState>,
+    _user: AuthUser,
+    Query(query): Query<StandardsQuery>,
+) -> AppResult<Json<Value>> {
+    let category = match query.category.as_deref() {
+        Some(value) => Some(
+            crate::standards::catalog::StandardCategory::parse(value).ok_or_else(|| {
+                AppError::bad_request("category must be national/industry/local/group")
+            })?,
+        ),
+        None => None,
+    };
+    let implementation = match query.implementation.as_deref() {
+        Some(value) => Some(match value {
+            "done" => crate::standards::catalog::Implementation::Done,
+            "partial" => crate::standards::catalog::Implementation::Partial,
+            "missing" => crate::standards::catalog::Implementation::Missing,
+            "not_applicable" => crate::standards::catalog::Implementation::NotApplicable,
+            _ => return Err(AppError::bad_request("implementation filter is invalid")),
+        }),
+        None => None,
+    };
+    let specs = crate::standards::catalog::CATALOG
+        .iter()
+        .filter(|spec| category.is_none_or(|value| spec.category == value))
+        .filter(|spec| implementation.is_none_or(|value| spec.implementation == value))
+        .collect::<Vec<_>>();
     let (done, partial, missing, na) = crate::standards::catalog::counts();
     let (national, industry, local, group) = crate::standards::catalog::category_counts();
     Ok(Json(json!({
@@ -32,7 +65,12 @@ pub async fn standards(State(_state): State<AppState>, _user: AuthUser) -> AppRe
             "local": local,
             "group": group
         },
-        "standards": crate::standards::catalog::CATALOG,
+        "catalog_filter": {
+            "category": query.category,
+            "implementation": query.implementation
+        },
+        "filtered_count": specs.len(),
+        "standards": specs,
         "jt_t_809_2019": {
             "envelope": true,
             "crc32": true,
