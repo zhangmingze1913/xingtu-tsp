@@ -123,3 +123,21 @@ fn jt808_truncated_frames_are_rejected() {
         assert!(codec::parse_frame(&raw[..cut]).is_err(), "cut={cut}");
     }
 }
+
+#[test]
+fn jt809_session_handshake_rejects_invalid_transitions() {
+    let mut session = jt809::Jt809Session::new();
+    assert_eq!(session.state(), jt809::Jt809SessionState::Disconnected);
+    assert!(session.on_login_response(0).is_err());
+    session.mark_login_sent().expect("login sent");
+    assert!(session.mark_login_sent().is_err());
+    session.on_login_response(0).expect("login ok");
+    assert_eq!(session.state(), jt809::Jt809SessionState::Online);
+    session.close();
+    assert_eq!(session.state(), jt809::Jt809SessionState::Closed);
+
+    let mut rejected = jt809::Jt809Session::new();
+    rejected.mark_login_sent().expect("login");
+    rejected.on_login_response(1).expect("response");
+    assert_eq!(rejected.state(), jt809::Jt809SessionState::Disconnected);
+}

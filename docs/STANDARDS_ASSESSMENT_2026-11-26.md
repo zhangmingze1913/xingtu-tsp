@@ -104,7 +104,8 @@
    - `standards` 全量条目（含 category/version/status）
 5. 新增 catalog 分类/版本测试。
 6. 新增 JT/T 808 固定夹具字段/截断负向测试（0100/0107/0200/8203）。
-7. 新增车辆驾驶员 PII 删除能力：`DELETE /api/vehicles/{id}/pii`，删除 `pii_vault` 并清空车辆字段，写审计；对应 GB/T 35273/41871 的删除控制。
+7. 新增 JT/T 809 会话状态机测试（登录/上线/关闭/非法迁移）。
+8. 新增车辆驾驶员 PII 删除能力：`DELETE /api/vehicles/{id}/pii`，删除 `pii_vault` 并清空车辆字段，写审计；对应 GB/T 35273/41871 的删除控制。
 
 ## 8. 准确表述
 
