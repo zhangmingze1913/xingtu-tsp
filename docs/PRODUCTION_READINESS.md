@@ -1,3 +1,5 @@
+> 最新业务/技术 Go/No-Go 评分见 [PRODUCTION_GO_NO_GO_2026-11-26.md](PRODUCTION_GO_NO_GO_2026-11-26.md)。
+
 # 生产就绪评估与退出计划
 
 > 本文件是“生产就绪”章节的正式口径。**当前不满足生产就绪**，不能把下列部分通过项外推为生产可用。
@@ -30,7 +32,7 @@ GitHub 提交：符合
 
 | 能力 | 状态 | 证据/缺口 |
 | --- | --- | --- |
-| 单机 SQLite | 通过 | 297 单元测试 |
+| 单机 SQLite | 通过 | 298 单元测试 |
 | PostgreSQL 16 | 通过 | 真实容器 |
 | PostGIS 3.4 | 通过 | geometry/GiST/bbox |
 | PostgreSQL 主从 | 通过（手工） | streaming/async/lag0/promote |

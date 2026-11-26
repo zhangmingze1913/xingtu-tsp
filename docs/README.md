@@ -31,6 +31,7 @@ PERFORMANCE_EVALUATION_2026-11-25.md   本次性能评估
 RECOMMENDATIONS.md                     选型与使用建议
 DELIVERY_CHECKLIST.md                  交付/验收清单
 PRODUCTION_READINESS.md                生产就绪评估/退出计划
+PRODUCTION_GO_NO_GO_2026-11-26.md      生产 Go/No-Go 评估
 ```
 
 ## 3. 专题文档

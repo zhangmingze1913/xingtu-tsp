@@ -51,6 +51,7 @@
 - [使用建议](docs/RECOMMENDATIONS.md)
 - [交付清单](docs/DELIVERY_CHECKLIST.md)
 - [生产就绪评估](docs/PRODUCTION_READINESS.md)
+- [生产 Go/No-Go](docs/PRODUCTION_GO_NO_GO_2026-11-26.md)
 
 ## 2. 快速启动
 
