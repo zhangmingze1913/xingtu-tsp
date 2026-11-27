@@ -12,6 +12,7 @@
 | F-04 | 无生产 K8s overlay，PII/导出密钥未接入 | 新增 `deploy/overlays/production`，`kubectl kustomize` 校验 | manifest 校验 |
 | F-05 | health 无法区分空间能力 | 增加 `postgis/kgis/lat_lon_fallback` | `health_reports_spatial_backend` |
 | F-06 | 删除车辆只删 `vehicles`，`pii_vault` 无外键级联，遗留孤儿 PII | 同事务删除 `pii_vault` + vehicle | `vehicle_delete_removes_vaulted_pii` |
+| F-07 | 畸形输入 fuzz 仅覆盖 5 个入口/200 组 | 扩到 7 个入口/1000 组，覆盖 808 注册/位置/批量、809 2019 头、32960 签名/激活 | `malformed_frames_never_panic` |
 
 ## 2. 未完全实现（Open）
 
