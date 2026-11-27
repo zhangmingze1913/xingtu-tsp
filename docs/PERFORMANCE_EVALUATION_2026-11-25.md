@@ -365,3 +365,31 @@ PII 解密/审计
 ```
 
 这些需要用可符号化 flamegraph 或数据库慢日志进一步确认。
+
+
+## 13. 2026-11-27 0x0704 批量预取
+
+原 `ingest_locations` 对批次内每个点执行一次：
+
+```text
+SELECT vehicle + vehicle_state
+```
+
+现改为每个不同 vehicle 预取一次：
+
+```text
+一次 SELECT -> VehicleContext
+逐点在内存推进 previous state
+```
+
+保留：
+
+```text
+同一事务
+时间排序
+claim 去重
+trip/fence/alert 业务
+```
+
+批量 100 点从约 100 次车辆/状态查询降为 1 次（单车辆批次）。
+测试：`tests/storage.rs`、`tests/jt808_terminal_sim.rs`。

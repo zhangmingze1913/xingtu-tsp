@@ -6,6 +6,8 @@
 //! twice. Alert dedupe and trip/fence transitions stay in the same transaction
 //! as the point, trading per-point queries for exactly-once business state.
 
+use std::collections::HashMap;
+
 use sqlx::{Any, Row, Transaction};
 
 use crate::{
@@ -16,6 +18,7 @@ use crate::{
 
 use super::{get_f64, get_i64, get_opt_f64, Db};
 
+#[derive(Clone)]
 pub(crate) struct PreviousState {
     pub(crate) lat: Option<f64>,
     pub(crate) lon: Option<f64>,
@@ -26,7 +29,56 @@ pub(crate) struct PreviousState {
     pub(crate) updated_at: String,
 }
 
+/// Per-batch vehicle metadata plus the last accepted state. The batch path
+/// advances this in memory instead of re-reading vehicle_state for every point.
+struct VehicleContext {
+    plate_no: String,
+    model: String,
+    previous: Option<PreviousState>,
+}
+
 impl Db {
+    /// Load vehicle metadata and its previous state once per batch vehicle.
+    async fn load_vehicle_context(
+        &self,
+        tx: &mut Transaction<'_, Any>,
+        vehicle_id: &str,
+    ) -> AppResult<Option<VehicleContext>> {
+        let sql = self.sql(
+            "SELECT v.plate_no, v.model,
+                    s.lat, s.lon, s.speed, s.soc, s.odometer_km, s.status, s.updated_at
+             FROM vehicles v
+             LEFT JOIN vehicle_state s ON s.vehicle_id = v.id
+             WHERE v.id = ?1",
+        );
+        let Some(row) = self
+            .query(&sql)
+            .bind(vehicle_id)
+            .fetch_optional(&mut *tx)
+            .await?
+        else {
+            return Ok(None);
+        };
+        let previous = if row.try_get::<Option<String>, _>(8)?.is_some() {
+            Some(PreviousState {
+                lat: get_opt_f64(&row, 2)?,
+                lon: get_opt_f64(&row, 3)?,
+                speed: get_f64(&row, 4)?,
+                soc: get_f64(&row, 5)?,
+                odometer_km: get_f64(&row, 6)?,
+                status: row.try_get(7)?,
+                updated_at: row.try_get(8)?,
+            })
+        } else {
+            None
+        };
+        Ok(Some(VehicleContext {
+            plate_no: row.try_get(0)?,
+            model: row.try_get(1)?,
+            previous,
+        }))
+    }
+
     /// Insert an alert inside the ingestion transaction. Kept as a method so the
     /// backend-specific placeholder translation is shared with every other query.
     #[allow(clippy::too_many_arguments)]
@@ -169,7 +221,9 @@ impl Db {
         sample: LocationSample,
     ) -> crate::error::AppResult<Option<IngestOutcome>> {
         let mut tx = self.pool().begin().await?;
-        let outcome = self.ingest_location_tx(&mut tx, sample, false).await?;
+        let outcome = self
+            .ingest_location_tx(&mut tx, sample, false, None)
+            .await?;
         tx.commit().await?;
         Ok(outcome)
     }
@@ -183,9 +237,43 @@ impl Db {
         // machines need chronological input.
         samples.sort_by(|a, b| a.ts.cmp(&b.ts));
         let mut tx = self.pool().begin().await?;
+        // One vehicle/state read per distinct vehicle, not per point. The
+        // in-memory previous state advances with each accepted sample.
+        let mut contexts: HashMap<String, VehicleContext> = HashMap::new();
+        for sample in &samples {
+            if !contexts.contains_key(&sample.vehicle_id) {
+                if let Some(context) = self
+                    .load_vehicle_context(&mut tx, &sample.vehicle_id)
+                    .await?
+                {
+                    contexts.insert(sample.vehicle_id.clone(), context);
+                }
+            }
+        }
         let mut outcomes = Vec::with_capacity(samples.len());
         for sample in samples {
-            outcomes.push(self.ingest_location_tx(&mut tx, sample, true).await?);
+            let vehicle_id = sample.vehicle_id.clone();
+            let Some(context) = contexts.get(&vehicle_id) else {
+                outcomes.push(None);
+                continue;
+            };
+            let outcome = self
+                .ingest_location_tx(&mut tx, sample, true, Some(context))
+                .await?;
+            if let Some(outcome) = &outcome {
+                if let Some(context) = contexts.get_mut(&vehicle_id) {
+                    context.previous = Some(PreviousState {
+                        lat: Some(outcome.lat),
+                        lon: Some(outcome.lon),
+                        speed: outcome.speed,
+                        soc: outcome.soc,
+                        odometer_km: outcome.odometer_km,
+                        status: outcome.status.clone(),
+                        updated_at: outcome.ts.clone(),
+                    });
+                }
+            }
+            outcomes.push(outcome);
         }
         tx.commit().await?;
         Ok(outcomes)
@@ -196,21 +284,19 @@ impl Db {
         tx: &mut Transaction<'_, Any>,
         sample: LocationSample,
         claim: bool,
+        prefetched: Option<&VehicleContext>,
     ) -> crate::error::AppResult<Option<IngestOutcome>> {
-        let sql = self.sql(
-            "SELECT v.plate_no, v.model,
-                    s.lat, s.lon, s.speed, s.soc, s.odometer_km, s.status, s.updated_at
-             FROM vehicles v
-             LEFT JOIN vehicle_state s ON s.vehicle_id = v.id
-             WHERE v.id = ?1",
-        );
-        let vehicle = self
-            .query(&sql)
-            .bind(sample.vehicle_id.as_str())
-            .fetch_optional(&mut *tx)
-            .await?;
-        let Some(vehicle) = vehicle else {
-            return Ok(None);
+        let (plate_no, model, previous) = if let Some(context) = prefetched {
+            (
+                context.plate_no.clone(),
+                context.model.clone(),
+                context.previous.clone(),
+            )
+        } else {
+            let Some(context) = self.load_vehicle_context(tx, &sample.vehicle_id).await? else {
+                return Ok(None);
+            };
+            (context.plate_no, context.model, context.previous)
         };
         if claim
             && !self
@@ -219,22 +305,6 @@ impl Db {
         {
             return Ok(None);
         }
-        let plate_no: String = vehicle.try_get(0)?;
-        let model: String = vehicle.try_get(1)?;
-        let has_state: Option<String> = vehicle.try_get(8)?;
-        let previous = if has_state.is_some() {
-            Some(PreviousState {
-                lat: get_opt_f64(&vehicle, 2)?,
-                lon: get_opt_f64(&vehicle, 3)?,
-                speed: get_f64(&vehicle, 4)?,
-                soc: get_f64(&vehicle, 5)?,
-                odometer_km: get_f64(&vehicle, 6)?,
-                status: vehicle.try_get(7)?,
-                updated_at: vehicle.try_get(8)?,
-            })
-        } else {
-            None
-        };
 
         let prev_soc = previous.as_ref().map(|p| p.soc).unwrap_or(0.0);
         let prev_odometer = previous.as_ref().map(|p| p.odometer_km).unwrap_or(0.0);
