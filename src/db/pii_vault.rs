@@ -76,6 +76,10 @@ impl Db {
     }
 
     /// Read several fields for several owners in one query.
+    /// Fetch many PII rows grouped by owner id, then field.
+    ///
+    /// The nested shape lets callers look up with `&str`; the previous
+    /// `(String, String)` key required a clone for every row/field lookup.
     pub async fn get_pii_batch(
         &self,
         owner_type: &str,
