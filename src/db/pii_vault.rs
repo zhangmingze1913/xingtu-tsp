@@ -81,7 +81,8 @@ impl Db {
         owner_type: &str,
         owner_ids: &[String],
         fields: &[&str],
-    ) -> AppResult<std::collections::HashMap<(String, String), String>> {
+    ) -> AppResult<std::collections::HashMap<String, std::collections::HashMap<String, String>>>
+    {
         if owner_ids.is_empty() || fields.is_empty() {
             return Ok(std::collections::HashMap::new());
         }
@@ -104,12 +105,15 @@ impl Db {
             query = query.bind(id);
         }
         let rows = query.fetch_all(self.pool()).await?;
-        let mut out = std::collections::HashMap::with_capacity(rows.len());
+        // Group by owner so callers can look up with &str and avoid
+        // cloning the vehicle id/field for every row.
+        let mut out: std::collections::HashMap<String, std::collections::HashMap<String, String>> =
+            std::collections::HashMap::with_capacity(rows.len());
         for row in rows {
-            out.insert(
-                (row.get::<String, _>(0), row.get::<String, _>(1)),
-                row.get::<String, _>(2),
-            );
+            let owner = row.get::<String, _>(0);
+            let field = row.get::<String, _>(1);
+            let ciphertext = row.get::<String, _>(2);
+            out.entry(owner).or_default().insert(field, ciphertext);
         }
         Ok(out)
     }

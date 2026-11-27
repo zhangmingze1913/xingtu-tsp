@@ -358,10 +358,11 @@ impl Db {
             .await?;
         let mut events = Vec::new();
         for vehicle in vehicles {
+            let Some(fields) = values.get(vehicle.id.as_str()) else {
+                continue;
+            };
             if vehicle.driver_phone == DRIVER_PHONE_VAULT_MARKER {
-                if let Some(ciphertext) =
-                    values.get(&(vehicle.id.clone(), "driver_phone".to_string()))
-                {
+                if let Some(ciphertext) = fields.get("driver_phone") {
                     let decrypted = ring.decrypt(ciphertext);
                     events.push(decrypted.is_ok());
                     if let Ok(phone) = decrypted {
@@ -370,9 +371,7 @@ impl Db {
                 }
             }
             if vehicle.driver_name == DRIVER_PHONE_VAULT_MARKER {
-                if let Some(ciphertext) =
-                    values.get(&(vehicle.id.clone(), "driver_name".to_string()))
-                {
+                if let Some(ciphertext) = fields.get("driver_name") {
                     let decrypted = ring.decrypt(ciphertext);
                     events.push(decrypted.is_ok());
                     if let Ok(name) = decrypted {

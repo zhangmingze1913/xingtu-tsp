@@ -285,3 +285,22 @@ dashboard 热：p50 1.6–4.6 ms
 ```
 
 这是 18 车、KES、同组织 burst 的结果；没有做“无 single-flight”严格 A/B，不能量化成固定百分比。
+
+
+## 11. 2026-11-27 PII hydration 分配优化
+
+`get_pii_batch` 从 `HashMap<(String, String), String>` 改为按 owner 的嵌套 map：
+
+```text
+HashMap<owner_id, HashMap<field, ciphertext>>
+```
+
+调用方用 `&str` 查找，去掉每行：
+
+```text
+vehicle.id.clone()
+"driver_phone".to_string()
+"driver_name".to_string()
+```
+
+50 行页面由约 150 次小分配降为 0 次查找分配。该改动不改变查询次数或协议语义。
