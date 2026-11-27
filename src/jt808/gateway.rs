@@ -12,6 +12,7 @@ use std::{
 };
 
 use ipnet::IpNet;
+use memchr::memchr;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_rustls::TlsAcceptor;
 
@@ -215,24 +216,28 @@ where
         buffer.extend_from_slice(&chunk[..read]);
 
         loop {
-            let Some(start) = buffer.iter().position(|byte| *byte == 0x7e) else {
+            let Some(start) = memchr(0x7e, &buffer) else {
                 buffer.clear();
                 break;
             };
             if start > 0 {
                 buffer.drain(..start);
             }
-            let Some(end) = buffer.iter().skip(1).position(|byte| *byte == 0x7e) else {
+            let Some(end) = memchr(0x7e, &buffer[1..]).map(|offset| offset + 1) else {
                 break;
             };
-            let end = end + 1;
-            let raw = buffer[..=end].to_vec();
-            buffer.drain(..=end);
-            if raw.len() <= 2 {
+            if end <= 1 {
+                // Empty frame (`7e 7e`): drop it without allocating.
+                buffer.drain(..=end);
                 continue;
             }
 
-            let frame = match parse_frame(&raw) {
+            // Parse straight out of the read buffer; `parse_frame` returns an
+            // owned frame, so the immutable borrow ends before the drain below.
+            // This removes a full-frame `to_vec` copy per message.
+            let parsed = parse_frame(&buffer[..=end]);
+            buffer.drain(..=end);
+            let frame = match parsed {
                 Ok(frame) => frame,
                 Err(error) => {
                     state

@@ -342,7 +342,7 @@ pub fn parse_frame(raw: &[u8]) -> Result<Frame, ProtocolError> {
         raw
     };
 
-    let decoded = unescape(data)?;
+    let mut decoded = unescape(data)?;
     if decoded.len() < 13 {
         return Err(ProtocolError::TooShort);
     }
@@ -360,17 +360,15 @@ pub fn parse_frame(raw: &[u8]) -> Result<Frame, ProtocolError> {
     }
     let terminal_id = decode_bcd_phone(&decoded[4..10])?;
     let serial = u16::from_be_bytes([decoded[10], decoded[11]]);
-    let mut body = decoded[12..12 + body_len].to_vec();
     let subpackage = if body_props & 0x2000 != 0 {
-        if body.len() < 4 {
+        if body_len < 4 {
             return Err(ProtocolError::BodyLengthMismatch);
         }
-        let total = u16::from_be_bytes([body[0], body[1]]);
-        let index = u16::from_be_bytes([body[2], body[3]]);
+        let total = u16::from_be_bytes([decoded[12], decoded[13]]);
+        let index = u16::from_be_bytes([decoded[14], decoded[15]]);
         if total == 0 || index == 0 || index > total {
             return Err(ProtocolError::SubPackageUnsupported);
         }
-        body.drain(..4);
         Some((total, index))
     } else {
         None
@@ -378,11 +376,19 @@ pub fn parse_frame(raw: &[u8]) -> Result<Frame, ProtocolError> {
     if (body_props >> 10) & 0x07 != 0 {
         return Err(ProtocolError::EncryptedUnsupported);
     }
+    // Move the body out of the decoded frame instead of allocating and copying
+    // a second `Vec` for it: dropping the 12-byte header and the trailing
+    // checksum is a short in-place memmove, no allocation.
+    decoded.drain(..12);
+    decoded.truncate(body_len);
+    if subpackage.is_some() {
+        decoded.drain(..4);
+    }
     Ok(Frame {
         msg_id,
         terminal_id,
         serial,
-        body,
+        body: decoded,
         subpackage,
     })
 }

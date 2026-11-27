@@ -152,10 +152,15 @@ pub(super) async fn process_frame(
             general_response(frame, result, server_serial).ok()
         }
         _ => {
-            tracing::debug!(
-                msg_id = format!("{:#06x}", frame.msg_id),
-                "unsupported JT808 message"
-            );
+            // `format!` in a tracing field is evaluated eagerly, even when the
+            // DEBUG level is disabled. Gate it so the hot path stays allocation
+            // free for unsupported message ids.
+            if tracing::enabled!(tracing::Level::DEBUG) {
+                tracing::debug!(
+                    msg_id = format!("{:#06x}", frame.msg_id),
+                    "unsupported JT808 message"
+                );
+            }
             general_response(frame, 3, server_serial).ok()
         }
     }
