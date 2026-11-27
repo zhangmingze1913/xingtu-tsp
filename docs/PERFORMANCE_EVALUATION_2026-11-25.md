@@ -304,3 +304,64 @@ vehicle.id.clone()
 ```
 
 50 行页面由约 150 次小分配降为 0 次查找分配。该改动不改变查询次数或协议语义。
+
+
+## 12. 2026-11-27 整体性能与火焰图
+
+### 工具
+
+```text
+WPT/xperf  已从 ADK ISO 安装
+samply     已实际采样
+```
+
+profile：
+
+```text
+D:\tsp-profile-sqlite.json.gz
+D:\tsp-profile-debug.json.gz
+D:\tsp-profile-sym2.json.gz
+D:\tsp-profile-sym3.json.gz
+```
+
+### SQLite 负载
+
+```text
+release 10x20：824.9 req/s，0 失败
+debug   10x20：225.3 req/s，0 失败
+```
+
+### 已做优化
+
+```text
+dashboard 趋势 14 -> 2 SQL
+车辆汇总/状态 3 -> 2 查询
+dashboard per-org single-flight
+PII hydration 改为 owner 嵌套 map，去掉逐行 id/field 分配
+JT1078 gap-skip 死循环修复
+畸形输入 fuzz 1000 组/7 入口
+```
+
+### 火焰图限制
+
+samply profile 的 `meta.symbolicated=false`，栈仍是地址：
+
+```text
+0xa0fd4
+0xa03d4
+```
+
+已尝试 release/debug + PDB + `--unstable-presymbolicate`，仍未得到函数名。
+因此不把地址栈当作火焰图结论，也不伪造 SVG。
+
+### 潜在热点
+
+```text
+dashboard 冷查询仍受 DB IO 影响
+telemetry 批量仍是逐点事务内查询
+JT808 每帧分配
+PII 解密/审计
+导出 CSV/加密
+```
+
+这些需要用可符号化 flamegraph 或数据库慢日志进一步确认。
