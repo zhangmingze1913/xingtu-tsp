@@ -215,28 +215,31 @@ where
         }
         buffer.extend_from_slice(&chunk[..read]);
 
+        // Walk the frames inside the read buffer with a cursor and compact the
+        // buffer once per read. Draining after every frame moved the whole tail
+        // each time, which is O(n^2) when one read carries many small messages.
+        let mut cursor = 0usize;
         loop {
-            let Some(start) = memchr(0x7e, &buffer) else {
-                buffer.clear();
+            let Some(rel_start) = memchr(0x7e, &buffer[cursor..]) else {
+                cursor = buffer.len();
                 break;
             };
-            if start > 0 {
-                buffer.drain(..start);
-            }
-            let Some(end) = memchr(0x7e, &buffer[1..]).map(|offset| offset + 1) else {
+            let start = cursor + rel_start;
+            let Some(rel_end) = memchr(0x7e, &buffer[start + 1..]).map(|offset| offset + 1) else {
+                cursor = start;
                 break;
             };
-            if end <= 1 {
+            let end = start + rel_end;
+            if end <= start + 1 {
                 // Empty frame (`7e 7e`): drop it without allocating.
-                buffer.drain(..=end);
+                cursor = end + 1;
                 continue;
             }
 
             // Parse straight out of the read buffer; `parse_frame` returns an
-            // owned frame, so the immutable borrow ends before the drain below.
-            // This removes a full-frame `to_vec` copy per message.
-            let parsed = parse_frame(&buffer[..=end]);
-            buffer.drain(..=end);
+            // owned frame, so no full-frame copy is needed per message.
+            let parsed = parse_frame(&buffer[start..=end]);
+            cursor = end + 1;
             let frame = match parsed {
                 Ok(frame) => frame,
                 Err(error) => {
@@ -325,6 +328,9 @@ where
                     break;
                 }
             }
+        }
+        if cursor > 0 {
+            buffer.drain(..cursor);
         }
     }
 

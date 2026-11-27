@@ -80,7 +80,9 @@ pub(super) async fn auth(
     {
         Ok(true) => {
             *authenticated = true;
-            sessions.insert(frame.terminal_id.clone());
+            if !sessions.contains(frame.terminal_id.as_str()) {
+        sessions.insert(frame.terminal_id.clone());
+    }
             register_terminal_sender(&frame.terminal_id, out_tx.clone(), cancel.clone());
             state
                 .cluster
@@ -120,7 +122,9 @@ pub(super) async fn heartbeat(
         return general_response(frame, 1, server_serial).ok();
     }
     let _ = state.db.heartbeat_terminal(&frame.terminal_id).await;
-    sessions.insert(frame.terminal_id.clone());
+    if !sessions.contains(frame.terminal_id.as_str()) {
+        sessions.insert(frame.terminal_id.clone());
+    }
     state
         .cluster
         .register_session(&frame.terminal_id, peer)

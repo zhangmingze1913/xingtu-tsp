@@ -29,7 +29,9 @@ pub(super) async fn ingest_location(
         tracing::debug!(terminal = %frame.terminal_id, "terminal is not bound to a vehicle");
         return 1;
     };
-    sessions.insert(frame.terminal_id.clone());
+    if !sessions.contains(frame.terminal_id.as_str()) {
+        sessions.insert(frame.terminal_id.clone());
+    }
     state
         .cluster
         .register_session(&frame.terminal_id, peer)
@@ -103,7 +105,9 @@ pub(super) async fn ingest_batch(
     let Some(vehicle_id) = terminal.vehicle_id else {
         return 1;
     };
-    sessions.insert(frame.terminal_id.clone());
+    if !sessions.contains(frame.terminal_id.as_str()) {
+        sessions.insert(frame.terminal_id.clone());
+    }
     state
         .cluster
         .register_session(&frame.terminal_id, peer)

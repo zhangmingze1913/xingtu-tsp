@@ -57,10 +57,17 @@ impl FileLogStore {
     async fn persist(&self, state: &DiskState) -> io::Result<()> {
         let bytes = serde_json::to_vec(state)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-        let tmp = self.path.with_extension("json.tmp");
-        std::fs::write(&tmp, bytes)?;
-        std::fs::rename(&tmp, &self.path)?;
-        Ok(())
+        let path = self.path.clone();
+        // write+rename is blocking file I/O: run it on the blocking pool so a
+        // log append does not stall the async worker thread.
+        tokio::task::spawn_blocking(move || -> io::Result<()> {
+            let tmp = path.with_extension("json.tmp");
+            std::fs::write(&tmp, &bytes)?;
+            std::fs::rename(&tmp, &path)?;
+            Ok(())
+        })
+        .await
+        .map_err(|error| io::Error::new(io::ErrorKind::Other, error))?
     }
 }
 
