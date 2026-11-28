@@ -78,6 +78,7 @@ pub async fn bind(
 ) -> AppResult<Json<Terminal>> {
     user.require_write()?;
     let terminal = state.db.bind_terminal(&id, payload.vehicle_id).await?;
+    state.cluster.invalidate_terminal(&terminal.phone).await;
     state
         .db
         .audit(

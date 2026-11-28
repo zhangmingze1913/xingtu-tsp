@@ -183,6 +183,26 @@ fn peer_allowed(peer: SocketAddr, allowed: &[IpNet]) -> bool {
 
 const MAX_JT808_BUFFER_BYTES: usize = 64 * 1024;
 
+/// Cached terminal lookup for per-location hot paths.
+pub(super) async fn terminal_for(state: &AppState, phone: &str) -> Option<crate::models::Terminal> {
+    if let Some(terminal) = state.cluster.cached_terminal(phone).await {
+        state
+            .metrics
+            .terminal_cache_hits
+            .fetch_add(1, Ordering::Relaxed);
+        return Some(terminal);
+    }
+    state
+        .metrics
+        .terminal_cache_misses
+        .fetch_add(1, Ordering::Relaxed);
+    let terminal = state.db.get_terminal_by_phone(phone).await.ok().flatten();
+    if let Some(ref terminal) = terminal {
+        state.cluster.cache_terminal(terminal).await;
+    }
+    terminal
+}
+
 async fn handle_connection<S>(
     stream: S,
     state: AppState,

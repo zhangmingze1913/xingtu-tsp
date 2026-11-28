@@ -15,12 +15,7 @@ pub(super) async fn ingest_location(
         tracing::debug!(terminal = %frame.terminal_id, "location before authentication rejected");
         return 1;
     }
-    let terminal = state
-        .db
-        .get_terminal_by_phone(&frame.terminal_id)
-        .await
-        .ok()
-        .flatten();
+    let terminal = terminal_for(state, &frame.terminal_id).await;
     let Some(terminal) = terminal else {
         tracing::debug!(terminal = %frame.terminal_id, "location from unknown terminal");
         return 1;
@@ -93,13 +88,7 @@ pub(super) async fn ingest_batch(
     if !authenticated {
         return 1;
     }
-    let Some(terminal) = state
-        .db
-        .get_terminal_by_phone(&frame.terminal_id)
-        .await
-        .ok()
-        .flatten()
-    else {
+    let Some(terminal) = terminal_for(state, &frame.terminal_id).await else {
         return 1;
     };
     let Some(vehicle_id) = terminal.vehicle_id else {

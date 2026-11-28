@@ -363,6 +363,7 @@ pub async fn bind_terminal(
             payload.model.trim(),
         )
         .await?;
+    state.cluster.invalidate_terminal(&terminal.phone).await;
     state
         .db
         .audit(

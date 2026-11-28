@@ -17,6 +17,8 @@ pub struct Metrics {
     pub ws_connections: AtomicI64,
     pub jt808_connections: AtomicI64,
     pub jt808_rejected_connections: AtomicU64,
+    pub terminal_cache_hits: AtomicU64,
+    pub terminal_cache_misses: AtomicU64,
     pub jt808_frames: AtomicU64,
     pub jt808_frame_errors: AtomicU64,
     pub jt808_auth_failures: AtomicU64,
@@ -69,6 +71,18 @@ impl Metrics {
         out.push_str(&format!(
             "xingtu_jt808_rejected_connections_total {}\n",
             self.jt808_rejected_connections.load(Ordering::Relaxed)
+        ));
+        out.push_str("# HELP xingtu_terminal_cache_hits_total Terminal cache hits.\n");
+        out.push_str("# TYPE xingtu_terminal_cache_hits_total counter\n");
+        out.push_str(&format!(
+            "xingtu_terminal_cache_hits_total {}\n",
+            self.terminal_cache_hits.load(Ordering::Relaxed)
+        ));
+        out.push_str("# HELP xingtu_terminal_cache_misses_total Terminal cache misses.\n");
+        out.push_str("# TYPE xingtu_terminal_cache_misses_total counter\n");
+        out.push_str(&format!(
+            "xingtu_terminal_cache_misses_total {}\n",
+            self.terminal_cache_misses.load(Ordering::Relaxed)
         ));
         out.push_str("# HELP xingtu_jt808_frames_total JT/T 808 frames parsed.\n");
         out.push_str("# TYPE xingtu_jt808_frames_total counter\n");

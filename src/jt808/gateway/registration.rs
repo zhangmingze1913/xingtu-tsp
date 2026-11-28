@@ -26,6 +26,7 @@ pub(super) async fn register(
         .await
     {
         Ok(terminal) => {
+            state.cluster.invalidate_terminal(&frame.terminal_id).await;
             let registration_json = serde_json::json!({
                 "layout": &registration.layout,
                 "province": registration.province,

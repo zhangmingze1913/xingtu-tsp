@@ -22,7 +22,7 @@ use futures_util::StreamExt;
 use redis::{aio::ConnectionManager, AsyncCommands, Client, Script};
 use serde::{Deserialize, Serialize};
 
-use crate::raft::RaftControl;
+use crate::{models::Terminal, raft::RaftControl};
 
 type RaftBootstrap = (u64, String, Vec<(u64, String)>, bool);
 
@@ -36,6 +36,8 @@ const GATEWAY_CHANNEL_PREFIX: &str = "tsp:gateway:";
 const EVENTS_CHANNEL: &str = "tsp:events";
 const JT808_KICK_CHANNEL: &str = "tsp:jt808:kick";
 const REVOKED_TOKEN_PREFIX: &str = "tsp:revoked:";
+const TERMINAL_CACHE_PREFIX: &str = "tsp:terminal:";
+const TERMINAL_CACHE_TTL_SECONDS: u64 = 60;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SessionInfo {
@@ -218,6 +220,41 @@ impl Cluster {
                 AppError::internal("Redis 凭证吊销失败")
             })?;
         Ok(())
+    }
+
+    /// Read-through cache for terminal -> vehicle binding and metadata.
+    /// Location/auth hot paths hit this before PostgreSQL.
+    pub(crate) async fn cached_terminal(&self, phone: &str) -> Option<Terminal> {
+        let mut conn = self.connection()?;
+        let key = format!("{TERMINAL_CACHE_PREFIX}{phone}");
+        let raw: Option<String> = conn.get(key).await.ok()?;
+        serde_json::from_str(&raw?).ok()
+    }
+
+    pub(crate) async fn cache_terminal(&self, terminal: &Terminal) {
+        let Some(mut conn) = self.connection() else {
+            return;
+        };
+        let Ok(raw) = serde_json::to_string(terminal) else {
+            return;
+        };
+        let key = format!("{TERMINAL_CACHE_PREFIX}{}", terminal.phone);
+        if let Err(error) = conn
+            .set_ex::<_, _, ()>(&key, raw, TERMINAL_CACHE_TTL_SECONDS)
+            .await
+        {
+            tracing::debug!(%error, "terminal cache write failed");
+        }
+    }
+
+    pub(crate) async fn invalidate_terminal(&self, phone: &str) {
+        let Some(mut conn) = self.connection() else {
+            return;
+        };
+        let key = format!("{TERMINAL_CACHE_PREFIX}{phone}");
+        if let Err(error) = conn.del::<_, ()>(&key).await {
+            tracing::debug!(%error, "terminal cache invalidate failed");
+        }
     }
 
     pub(crate) async fn is_token_revoked(&self, jti: &str) -> AppResult<bool> {
