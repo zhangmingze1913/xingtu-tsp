@@ -507,3 +507,5 @@ Archive playback is available at `/api/media/archive/playback`; run `scripts/rus
 **星途车联 XINGTU TSP** · Rust / Axum / Tokio / SQLx / SQLite + PostgreSQL + MySQL / Redis / Apache Iggy / JT/T 808 / WebSocket
 
 - [缺陷/未实现登记](docs/DEFECT_REGISTER_2026-11-27.md)
+
+- [百万连接软硬件配置建议](百万连接软硬件配置建议.md)

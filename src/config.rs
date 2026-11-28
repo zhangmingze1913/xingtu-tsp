@@ -115,6 +115,8 @@ pub struct Config {
     pub jt808_client_ca: Option<PathBuf>,
     /// Optional CIDR allowlist for JT808 peers.
     pub jt808_allowed_cidrs: Vec<String>,
+    /// Maximum concurrent JT808 TCP connections accepted by this process.
+    pub jt808_max_connections: usize,
 }
 
 impl Config {
@@ -274,6 +276,11 @@ impl Config {
                 .ok()
                 .filter(|v| !v.is_empty())
                 .map(PathBuf::from),
+            jt808_max_connections: env::var("TSP_JT808_MAX_CONNECTIONS")
+                .ok()
+                .and_then(|value| value.parse::<usize>().ok())
+                .filter(|value| *value > 0)
+                .unwrap_or(1_000_000),
             jt808_allowed_cidrs: env::var("TSP_JT808_ALLOWED_CIDRS")
                 .ok()
                 .map(|value| {

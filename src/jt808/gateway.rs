@@ -14,6 +14,7 @@ use std::{
 use ipnet::IpNet;
 use memchr::memchr;
 use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::{sync::OwnedSemaphorePermit, sync::Semaphore};
 use tokio_rustls::TlsAcceptor;
 
 use super::*;
@@ -47,6 +48,7 @@ pub async fn serve(state: AppState) -> crate::error::AppResult<()> {
         "JT/T 808 gateway listening"
     );
     let serial = Arc::new(AtomicU16::new(1));
+    let connection_limit = Arc::new(Semaphore::new(state.config.jt808_max_connections.max(1)));
 
     loop {
         let (stream, peer) = match listener.accept().await {
@@ -60,11 +62,24 @@ pub async fn serve(state: AppState) -> crate::error::AppResult<()> {
             tracing::warn!(%peer, "JT808 peer rejected by CIDR allowlist");
             continue;
         }
+        let permit = match connection_limit.clone().try_acquire_owned() {
+            Ok(permit) => permit,
+            Err(_) => {
+                state
+                    .metrics
+                    .jt808_rejected_connections
+                    .fetch_add(1, Ordering::Relaxed);
+                tracing::warn!(%peer, limit = state.config.jt808_max_connections, "JT808 connection limit reached");
+                drop(stream);
+                continue;
+            }
+        };
         let state = state.clone();
         let serial = serial.clone();
         let peer = peer.to_string();
         let tls = tls.clone();
         tokio::spawn(async move {
+            let _permit: OwnedSemaphorePermit = permit;
             tracing::debug!(%peer, "JT808 terminal connected");
             state
                 .metrics

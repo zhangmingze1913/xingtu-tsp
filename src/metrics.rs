@@ -16,6 +16,7 @@ pub struct Metrics {
     pub commands_created: AtomicU64,
     pub ws_connections: AtomicI64,
     pub jt808_connections: AtomicI64,
+    pub jt808_rejected_connections: AtomicU64,
     pub jt808_frames: AtomicU64,
     pub jt808_frame_errors: AtomicU64,
     pub jt808_auth_failures: AtomicU64,
@@ -62,6 +63,12 @@ impl Metrics {
         out.push_str(&format!(
             "xingtu_jt808_connections {}\n",
             self.jt808_connections.load(Ordering::Relaxed)
+        ));
+        out.push_str("# HELP xingtu_jt808_rejected_connections_total JT/T 808 connections rejected by the process cap.\n");
+        out.push_str("# TYPE xingtu_jt808_rejected_connections_total counter\n");
+        out.push_str(&format!(
+            "xingtu_jt808_rejected_connections_total {}\n",
+            self.jt808_rejected_connections.load(Ordering::Relaxed)
         ));
         out.push_str("# HELP xingtu_jt808_frames_total JT/T 808 frames parsed.\n");
         out.push_str("# TYPE xingtu_jt808_frames_total counter\n");

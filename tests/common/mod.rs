@@ -68,6 +68,7 @@ pub fn test_config() -> Config {
         jt808_allow_plaintext: true,
         jt808_client_ca: None,
         jt808_allowed_cidrs: Vec::new(),
+        jt808_max_connections: 10_000,
     }
 }
 
