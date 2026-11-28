@@ -363,3 +363,48 @@ port-forward + /api/health = sqlite
 ```
 
 限制：单节点 kind/control-plane、SQLite、端口转发；不是生产验证。
+
+
+### 全链路脚本
+
+```powershell
+.\scripts\fullchain-smoke.ps1 `
+  -BaseUrl http://127.0.0.1:18090 `
+  -Jt808Addr 127.0.0.1:18091
+```
+
+同时跑 HTTP 基准与 JT808 鉴权/位置，遇到 `NG` 或 `result!=0` 失败。
+
+
+## 13. Rust 1.100 与全链路脚本
+
+```text
+rustc 1.100.0
+cargo 1.100.0
+Cargo.toml rust-version = "1.100"
+Dockerfile builder = rust:1.100-bookworm
+```
+
+全链路：
+
+```powershell
+.\scripts\fullchain-smoke.ps1 `
+  -BaseUrl http://127.0.0.1:18090 `
+  -Jt808Addr 127.0.0.1:18091
+```
+
+Docker 全链路：
+
+```text
+HTTP 10x20 279.2–337.1 req/s，0 失败
+JT808 鉴权 + 5 点全部 result=0
+dashboard 5.5–15.3 ms
+容器 CPU 1.19%，内存 105.4 MiB
+```
+
+kind 全链路：
+
+```text
+HTTP 10x10 141.5–153.3 req/s，0 失败
+JT808 鉴权 + 5 点全部 result=0
+```

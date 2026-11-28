@@ -427,3 +427,65 @@ MySQL: INSERT IGNORE
 ```
 
 同时修复 JT808 无界 buffer（64 KiB 上限）和 registration 缩进。
+
+
+## 16. 2026-11-28 全链路压测（Docker/K8s）
+
+脚本：
+
+```powershell
+.\scripts\fullchain-smoke.ps1 `
+  -BaseUrl http://127.0.0.1:18090 `
+  -Jt808Addr 127.0.0.1:18091
+```
+
+同一轮同时执行：
+
+```text
+HTTP 登录/车辆列表/dashboard/并发基准
+JT808 模拟终端：鉴权 + 5 次位置上报
+```
+
+### Docker SQLite
+
+```text
+HTTP 10x20：279.2–337.1 req/s，0 失败
+dashboard：5.5–15.3 ms
+JT808：鉴权 + 5 点全部 result=0
+容器：CPU 1.19%，内存 105.4 MiB
+```
+
+### kind SQLite
+
+```text
+HTTP 10x10：153.3 req/s，0 失败
+JT808：鉴权 + 5 点全部 result=0
+```
+
+结论：
+
+```text
+功能链路通过
+容器 CPU 很低，瓶颈在客户端/端口转发/SQLite 单写
+不是生产容量结论
+```
+
+
+## 17. Rust 1.100 工具链
+
+```text
+rustc 1.100.0
+cargo 1.100.0
+```
+
+Docker builder 改为：
+
+```text
+rust:1.100-bookworm
+```
+
+Cargo.toml 声明：
+
+```toml
+rust-version = "1.100"
+```
