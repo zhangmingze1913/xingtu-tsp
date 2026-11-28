@@ -31,9 +31,9 @@ pub(super) async fn ingest_location(
         .cluster
         .register_session(&frame.terminal_id, peer)
         .await;
-    if let Err(error) = state.db.heartbeat_terminal(&frame.terminal_id).await {
-        tracing::warn!(%error, "JT808 heartbeat update failed");
-    }
+    // 0x0002 owns the terminal heartbeat write. A location report must not
+    // issue one UPDATE per point at 100k msg/s; the cluster session below
+    // still marks the terminal online for routing.
     let sample = LocationSample {
         vehicle_id,
         ts: if location.ts.is_empty() {
@@ -101,9 +101,8 @@ pub(super) async fn ingest_batch(
         .cluster
         .register_session(&frame.terminal_id, peer)
         .await;
-    if let Err(error) = state.db.heartbeat_terminal(&frame.terminal_id).await {
-        tracing::warn!(%error, "JT808 heartbeat update failed");
-    }
+    // Heartbeat persistence is handled by 0x0002; locations only update
+    // session ownership and telemetry.
 
     let timestamps: Vec<String> = locations
         .iter()

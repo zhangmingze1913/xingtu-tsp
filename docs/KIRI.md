@@ -100,3 +100,14 @@ $d = "$env:LOCALAPPDATA\Kiri\bin\docker.exe"
 & $d --context kiri stats tsp-kiri
 & $d --context kiri rm -f tsp-kiri
 ```
+
+
+## 7. 2026-11-28 复测
+
+```text
+HTTP 10x20：181.6 req/s，0 失败
+JT808：鉴权 + 5 点全部 result=0
+容器：79.47 MiB
+```
+
+镜像仍是旧 1.94 构建，不包含最新心跳优化。

@@ -514,3 +514,23 @@ session_new_cancels_old...
 ```
 
 仍未做 1M 实测；32 队列容量和 64 shard 需要真实压测确认。
+
+
+## 19. 2026-11-28 心跳写入归属
+
+位置/批量上报原每个点执行：
+
+```text
+UPDATE terminals SET last_heartbeat_at=...
+```
+
+百万终端、10s 上报时约 100k UPDATE/s。
+
+改为：
+
+```text
+0x0002 心跳消息负责 last_heartbeat_at/status
+0x0200/0x0704 只更新会话/telemetry
+```
+
+这不改变在线路由的 cluster session；减少每点 DB 写放大。
