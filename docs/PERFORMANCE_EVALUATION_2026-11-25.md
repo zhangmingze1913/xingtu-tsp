@@ -409,3 +409,21 @@ buffer.len() > limit -> warn + close connection
 这是性能/内存 DoS 防护，不改变合法帧解析。
 
 同时修正 `registration.rs` 缩进，`raft_log` 使用 `io::Error::other` 满足 clippy。
+
+
+## 15. 2026-11-28 Docker/K8s 实测
+
+```text
+Docker SQLite：10x20 222.3 req/s，0 失败
+K8s kind SQLite：10x10 159.8 req/s，0 失败
+```
+
+容器启动发现 SQLite backfill 的 UPSERT 语法错误，已修复：
+
+```text
+SQLite: INSERT OR IGNORE
+Postgres: ON CONFLICT DO NOTHING
+MySQL: INSERT IGNORE
+```
+
+同时修复 JT808 无界 buffer（64 KiB 上限）和 registration 缩进。

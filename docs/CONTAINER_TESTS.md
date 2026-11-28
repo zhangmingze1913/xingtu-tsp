@@ -320,3 +320,46 @@ client rate limiter Wait ... context deadline
 仍未完成：多节点 Iggy/tsink、RustFS/TDengine 生产集群、K8s 多副本/托管/Ingress TLS。
 
 不要把 smoke 写成生产验证；上表是当前唯一口径。
+
+
+## 12. 2026-11-28 Docker + kind 验证
+
+Docker 镜像：
+
+```text
+xingtu-tsp:perf  169 MB
+```
+
+SQLite 容器：
+
+```text
+docker run ... xingtu-tsp:perf
+health database_engine=sqlite
+spatial_backend=lat_lon_fallback
+```
+
+发现并修复：
+
+```text
+SQLite 启动 backfill 的 INSERT ... SELECT ... ON CONFLICT 解析失败
+-> SQLite 分支改用 INSERT OR IGNORE
+```
+
+容器基准：
+
+```text
+100 次顺序：p50 6.1 ms，p95 10.1 ms
+10x20 并发：222.3 req/s，0 失败
+```
+
+kind：
+
+```text
+kind 集群 mq-rust-k8s
+镜像通过 ctr -n k8s.io images import 导入
+TSP_API Pod 1/1 Running
+port-forward + /api/health = sqlite
+10x10 并发：159.8 req/s，0 失败
+```
+
+限制：单节点 kind/control-plane、SQLite、端口转发；不是生产验证。
