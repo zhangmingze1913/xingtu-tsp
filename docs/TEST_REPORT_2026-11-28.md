@@ -100,3 +100,22 @@ Docker/kind 全链路复测
 3. 缓存命中指标纳入 SLO。
 4. 1M 压测单独环境，不在开发机执行。
 5. 不把 opt-in 跳过计为通过。
+
+
+## 7. Kiri / Monoio 补充
+
+Kiri 0.2.2 已安装并运行 WSL2 engine：
+
+```text
+docker context kiri
+HTTP+JT808 full-chain: 403.6 req/s, 0 failed
+container RSS: 60.09 MiB
+```
+
+Monoio opt-in：
+
+```text
+cargo check --features monoio-runtime --example monoio_gateway -> pass on host
+```
+
+未做 monoio 容器/全链路压测，生产 runtime 仍为 Tokio。

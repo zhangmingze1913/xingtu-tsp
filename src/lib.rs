@@ -24,6 +24,10 @@ pub mod error;
 mod export_crypto;
 mod iggy_bus;
 pub mod jt808;
+
+/// Opt-in Monoio runtime handle for Linux-only experiments.
+#[cfg(feature = "monoio-runtime")]
+pub use monoio as monoio_runtime;
 pub mod media;
 mod metrics;
 pub mod models;

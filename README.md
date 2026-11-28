@@ -511,3 +511,6 @@ Archive playback is available at `/api/media/archive/playback`; run `scripts/rus
 - [百万连接软硬件配置建议](百万连接软硬件配置建议.md)
 
 - [全量测试报告](docs/TEST_REPORT_2026-11-28.md)
+
+- [Kiri 容器测试](docs/KIRI.md)
+- [Monoio runtime](docs/MONOIO.md)
