@@ -168,3 +168,10 @@ async fn pii_and_key_audit_retention_purges_old_rows() {
         None
     );
 }
+
+#[tokio::test]
+async fn backfill_claims_works_on_sqlite() {
+    let db = Db::in_memory().await.expect("db");
+    let count = db.backfill_telemetry_claims().await.expect("backfill");
+    assert_eq!(count, 0);
+}

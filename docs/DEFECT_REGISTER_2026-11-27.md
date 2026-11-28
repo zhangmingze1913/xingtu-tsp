@@ -14,6 +14,7 @@
 | F-06 | 删除车辆只删 `vehicles`，`pii_vault` 无外键级联，遗留孤儿 PII | 同事务删除 `pii_vault` + vehicle | `vehicle_delete_removes_vaulted_pii` |
 | F-07 | 畸形输入 fuzz 仅覆盖 5 个入口/200 组 | 扩到 7 个入口/1000 组，覆盖 808 注册/位置/批量、809 2019 头、32960 签名/激活 | `malformed_frames_never_panic` |
 | F-08 | 无终止符的 JT808 帧可让连接 buffer 无界增长 | 加 64 KiB per-connection 上限，超限关闭连接 | `jt808_terminal_sim` / 代码审计 |
+| F-09 | SQLite 启动 backfill 使用 `INSERT ... SELECT ... ON CONFLICT`，解析失败 near "DO" | SQLite 分支改用 `INSERT OR IGNORE` | `backfill_claims_works_on_sqlite` |
 
 ## 2. 未完全实现（Open）
 

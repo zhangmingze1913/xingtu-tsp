@@ -203,6 +203,11 @@ impl Db {
         let sql = if self.is_mysql() {
             "INSERT IGNORE INTO telemetry_claims (vehicle_id, ts, created_at)
              SELECT DISTINCT vehicle_id, ts, ?1 FROM telemetry"
+        } else if self.is_sqlite() {
+            // SQLite parses `INSERT ... SELECT ... ON CONFLICT` ambiguously;
+            // its supported equivalent is INSERT OR IGNORE.
+            "INSERT OR IGNORE INTO telemetry_claims (vehicle_id, ts, created_at)
+             SELECT DISTINCT vehicle_id, ts, ?1 FROM telemetry"
         } else {
             "INSERT INTO telemetry_claims (vehicle_id, ts, created_at)
              SELECT DISTINCT vehicle_id, ts, ?1 FROM telemetry

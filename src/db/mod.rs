@@ -254,6 +254,10 @@ impl Db {
         self.backend == Backend::Mysql
     }
 
+    pub(crate) fn is_sqlite(&self) -> bool {
+        self.backend == Backend::Sqlite
+    }
+
     pub fn postgis_enabled(&self) -> bool {
         self.postgis.load(Ordering::Relaxed)
     }
