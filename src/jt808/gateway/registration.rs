@@ -81,8 +81,8 @@ pub(super) async fn auth(
         Ok(true) => {
             *authenticated = true;
             if !sessions.contains(frame.terminal_id.as_str()) {
-        sessions.insert(frame.terminal_id.clone());
-    }
+                sessions.insert(frame.terminal_id.clone());
+            }
             register_terminal_sender(&frame.terminal_id, out_tx.clone(), cancel.clone());
             state
                 .cluster

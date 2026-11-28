@@ -393,3 +393,19 @@ trip/fence/alert 业务
 
 批量 100 点从约 100 次车辆/状态查询降为 1 次（单车辆批次）。
 测试：`tests/storage.rs`、`tests/jt808_terminal_sim.rs`。
+
+
+## 14. 2026-11-27 JT808 连接 buffer 上限
+
+`handle_connection` 原逻辑在收到 `0x7e` 后等待闭合；若对端只发 `0x7e` + 无限数据，`buffer` 可无界增长。
+
+新增：
+
+```text
+MAX_JT808_BUFFER_BYTES = 64 KiB
+buffer.len() > limit -> warn + close connection
+```
+
+这是性能/内存 DoS 防护，不改变合法帧解析。
+
+同时修正 `registration.rs` 缩进，`raft_log` 使用 `io::Error::other` 满足 clippy。

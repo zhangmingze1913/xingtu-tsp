@@ -166,6 +166,8 @@ fn peer_allowed(peer: SocketAddr, allowed: &[IpNet]) -> bool {
     allowed.is_empty() || allowed.iter().any(|network| network.contains(&peer.ip()))
 }
 
+const MAX_JT808_BUFFER_BYTES: usize = 64 * 1024;
+
 async fn handle_connection<S>(
     stream: S,
     state: AppState,
@@ -214,6 +216,13 @@ where
             break;
         }
         buffer.extend_from_slice(&chunk[..read]);
+        // An unterminated frame must not grow the per-connection buffer without
+        // bound. A valid 808 frame is ~2 KiB after escaping, so 64 KiB is a
+        // generous guard against a slow/malicious sender.
+        if buffer.len() > MAX_JT808_BUFFER_BYTES {
+            tracing::warn!(%peer, bytes = buffer.len(), "JT808 frame buffer limit exceeded");
+            break;
+        }
 
         // Walk the frames inside the read buffer with a cursor and compact the
         // buffer once per read. Draining after every frame moved the whole tail
