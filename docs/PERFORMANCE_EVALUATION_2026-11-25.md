@@ -495,3 +495,22 @@ rust-version = "1.100"
 
 宿主 1.100 测试通过；Docker `rust:1.100-bookworm` 构建在应用 crate 链接阶段长时间无输出，未完成。
 本轮 Docker/K8s 结果来自 `rust:1.94.1` 镜像，不能写成 1.100 镜像结果。
+
+
+## 18. 百万连接前置改造
+
+本轮把两个明确风险改为：
+
+```text
+每连接下行：mpsc::channel(32) + try_send
+session：64-way shard，每 shard 独立 Mutex
+```
+
+测试：
+
+```text
+bounded_outbox_rejects_when_full
+session_new_cancels_old...
+```
+
+仍未做 1M 实测；32 队列容量和 64 shard 需要真实压测确认。

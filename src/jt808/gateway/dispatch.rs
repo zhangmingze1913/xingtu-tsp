@@ -11,7 +11,7 @@ pub(super) async fn process_frame(
     authenticated: &mut bool,
     peer: &str,
     sessions: &mut HashSet<String>,
-    out_tx: &mpsc::UnboundedSender<Vec<u8>>,
+    out_tx: &mpsc::Sender<Vec<u8>>,
     cancel: &Arc<AtomicBool>,
 ) -> Option<Vec<u8>> {
     let server_serial = next_serial(serial);

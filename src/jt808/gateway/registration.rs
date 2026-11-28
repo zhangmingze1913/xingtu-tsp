@@ -66,7 +66,7 @@ pub(super) async fn auth(
     authenticated: &mut bool,
     peer: &str,
     sessions: &mut HashSet<String>,
-    out_tx: &mpsc::UnboundedSender<Vec<u8>>,
+    out_tx: &mpsc::Sender<Vec<u8>>,
     cancel: &Arc<AtomicBool>,
 ) -> Option<Vec<u8>> {
     let code = String::from_utf8_lossy(&frame.body)
@@ -116,7 +116,7 @@ pub(super) async fn heartbeat(
     authenticated: bool,
     peer: &str,
     sessions: &mut HashSet<String>,
-    _out_tx: &mpsc::UnboundedSender<Vec<u8>>,
+    _out_tx: &mpsc::Sender<Vec<u8>>,
 ) -> Option<Vec<u8>> {
     if !authenticated {
         return general_response(frame, 1, server_serial).ok();

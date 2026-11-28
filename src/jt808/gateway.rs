@@ -194,7 +194,7 @@ where
 {
     let (mut reader, mut writer) = tokio::io::split(stream);
     let cancel = Arc::new(AtomicBool::new(false));
-    let (out_tx, mut out_rx) = mpsc::unbounded_channel::<Vec<u8>>();
+    let (out_tx, mut out_rx) = mpsc::channel::<Vec<u8>>(SESSION_OUTBOX_CAPACITY);
     let writer_task = tokio::spawn(async move {
         while let Some(frame) = out_rx.recv().await {
             if writer.write_all(&frame).await.is_err() {
@@ -348,7 +348,7 @@ where
             )
             .await
             {
-                if out_tx.send(response).is_err() {
+                if out_tx.try_send(response).is_err() {
                     break;
                 }
             }

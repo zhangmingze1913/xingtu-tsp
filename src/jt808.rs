@@ -7,7 +7,8 @@
 //! and the full 2019 command/parameter/area/video message set is not present.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{hash_map::DefaultHasher, HashMap, HashSet},
+    hash::{Hash, Hasher},
     sync::{
         atomic::{AtomicBool, AtomicU16, Ordering},
         Arc, Mutex, OnceLock,
@@ -32,16 +33,37 @@ use crate::{
     models::LocationSample, realtime::RealtimeEvent, services, state::AppState, util::now_iso,
 };
 
-type TerminalSender = mpsc::UnboundedSender<Vec<u8>>;
+const SESSION_SHARDS: usize = 64;
+const SESSION_OUTBOX_CAPACITY: usize = 32;
+
+type TerminalSender = mpsc::Sender<Vec<u8>>;
 
 struct TerminalSession {
     sender: TerminalSender,
     cancel: Arc<AtomicBool>,
 }
 
-fn sessions() -> &'static Mutex<HashMap<String, TerminalSession>> {
-    static SESSIONS: OnceLock<Mutex<HashMap<String, TerminalSession>>> = OnceLock::new();
-    SESSIONS.get_or_init(|| Mutex::new(HashMap::new()))
+struct SessionShard {
+    sessions: Mutex<HashMap<String, TerminalSession>>,
+}
+
+fn session_shards() -> &'static [SessionShard] {
+    static SHARDS: OnceLock<Vec<SessionShard>> = OnceLock::new();
+    SHARDS.get_or_init(|| {
+        (0..SESSION_SHARDS)
+            .map(|_| SessionShard {
+                sessions: Mutex::new(HashMap::new()),
+            })
+            .collect()
+    })
+}
+
+/// 64-way sharded registry: a flush/registration on one terminal no longer
+/// serializes all million connections behind a single global Mutex.
+fn sessions_for(phone: &str) -> &'static Mutex<HashMap<String, TerminalSession>> {
+    let mut hasher = DefaultHasher::new();
+    phone.hash(&mut hasher);
+    &session_shards()[hasher.finish() as usize % SESSION_SHARDS].sessions
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -253,7 +275,7 @@ fn command_serial() -> &'static AtomicU16 {
 }
 
 pub fn register_terminal_sender(phone: &str, sender: TerminalSender, cancel: Arc<AtomicBool>) {
-    if let Ok(mut sessions) = sessions().lock() {
+    if let Ok(mut sessions) = sessions_for(phone).lock() {
         if let Some(previous) = sessions.insert(
             phone.to_string(),
             TerminalSession {
@@ -270,7 +292,7 @@ pub fn register_terminal_sender(phone: &str, sender: TerminalSender, cancel: Arc
 /// Cancel a locally connected terminal. Cross-node sessions receive this via
 /// the Redis kick channel; the old connection closes on its next read/frame.
 pub fn cancel_terminal_session(phone: &str) {
-    if let Ok(sessions) = sessions().lock() {
+    if let Ok(sessions) = sessions_for(phone).lock() {
         if let Some(session) = sessions.get(phone) {
             session.cancel.store(true, Ordering::Relaxed);
         }
@@ -278,7 +300,7 @@ pub fn cancel_terminal_session(phone: &str) {
 }
 
 pub fn unregister_terminal_sender(phone: &str, cancel: &Arc<AtomicBool>) {
-    if let Ok(mut sessions) = sessions().lock() {
+    if let Ok(mut sessions) = sessions_for(phone).lock() {
         if sessions
             .get(phone)
             .is_some_and(|session| Arc::ptr_eq(&session.cancel, cancel))
@@ -296,7 +318,7 @@ pub fn send_text_command(
     payload: Option<&str>,
     command_id: &str,
 ) -> Result<u16, String> {
-    let sender = sessions()
+    let sender = sessions_for(phone)
         .lock()
         .map_err(|_| "JT808 session registry poisoned".to_string())?
         .get(phone)
@@ -306,7 +328,7 @@ pub fn send_text_command(
     let frame = build_text_frame(phone, command, payload, serial)?;
     register_pending_command(phone, serial, command_id);
     sender
-        .send(frame)
+        .try_send(frame)
         .map_err(|_| "终端连接已断开".to_string())?;
     Ok(serial)
 }
@@ -319,7 +341,7 @@ pub fn send_command(
     payload: Option<&str>,
     command_id: &str,
 ) -> Result<u16, String> {
-    let sender = sessions()
+    let sender = sessions_for(phone)
         .lock()
         .map_err(|_| "JT808 session registry poisoned".to_string())?
         .get(phone)
@@ -329,7 +351,7 @@ pub fn send_command(
     let frame = build_command_frame(phone, command, payload, serial)?;
     register_pending_command(phone, serial, command_id);
     sender
-        .send(frame)
+        .try_send(frame)
         .map_err(|_| "终端连接已断开".to_string())?;
     Ok(serial)
 }
@@ -424,7 +446,7 @@ pub fn next_command_serial() -> u16 {
 /// Send an arbitrary JT/T 808 downlink frame to a terminal connected to this
 /// gateway process. Used by parameter/control/query APIs.
 pub fn send_frame(phone: &str, msg_id: u16, body: &[u8]) -> Result<u16, String> {
-    let sender = sessions()
+    let sender = sessions_for(phone)
         .lock()
         .map_err(|_| "JT808 session registry poisoned".to_string())?
         .get(phone)
@@ -434,7 +456,7 @@ pub fn send_frame(phone: &str, msg_id: u16, body: &[u8]) -> Result<u16, String> 
     let frame = build_frame(msg_id, phone, serial, body)
         .map_err(|error| format!("构建 0x{msg_id:04x} 失败: {error}"))?;
     sender
-        .send(frame)
+        .try_send(frame)
         .map_err(|_| "终端连接已断开".to_string())?;
     Ok(serial)
 }
@@ -448,14 +470,14 @@ pub fn register_pending_command(phone: &str, serial: u16, command_id: &str) {
 /// Deliver a frame built by another API replica to a terminal that is connected
 /// to this gateway process.
 pub fn deliver_local_frame(phone: &str, frame: Vec<u8>) -> bool {
-    let Some(sender) = sessions()
+    let Some(sender) = sessions_for(phone)
         .lock()
         .ok()
         .and_then(|sessions| sessions.get(phone).map(|session| session.sender.clone()))
     else {
         return false;
     };
-    sender.send(frame).is_ok()
+    sender.try_send(frame).is_ok()
 }
 
 fn take_pending_command(phone: &str, serial: u16) -> Option<String> {
@@ -523,20 +545,31 @@ mod tests {
     #[test]
     fn new_session_cancels_old_and_old_cleanup_keeps_new() {
         let phone = "013800009999";
-        let (first, _first_rx) = mpsc::unbounded_channel();
+        let (first, _first_rx) = mpsc::channel(8);
         let first_cancel = Arc::new(AtomicBool::new(false));
         register_terminal_sender(phone, first, first_cancel.clone());
         assert!(!first_cancel.load(Ordering::Relaxed));
 
-        let (second, _second_rx) = mpsc::unbounded_channel();
+        let (second, _second_rx) = mpsc::channel(8);
         let second_cancel = Arc::new(AtomicBool::new(false));
         register_terminal_sender(phone, second, second_cancel.clone());
         assert!(first_cancel.load(Ordering::Relaxed));
 
         unregister_terminal_sender(phone, &first_cancel);
-        assert!(sessions().lock().unwrap().contains_key(phone));
+        assert!(sessions_for(phone).lock().unwrap().contains_key(phone));
         unregister_terminal_sender(phone, &second_cancel);
-        assert!(!sessions().lock().unwrap().contains_key(phone));
+        assert!(!sessions_for(phone).lock().unwrap().contains_key(phone));
+    }
+
+    #[test]
+    fn bounded_outbox_rejects_when_full() {
+        let phone = "013800009993";
+        let (sender, _rx) = mpsc::channel(1);
+        let cancel = Arc::new(AtomicBool::new(false));
+        register_terminal_sender(phone, sender, cancel.clone());
+        assert!(send_frame(phone, MSG_QUERY_PARAMETERS, &[]).is_ok());
+        assert!(send_frame(phone, MSG_QUERY_PARAMETERS, &[]).is_err());
+        unregister_terminal_sender(phone, &cancel);
     }
 
     #[test]
@@ -585,7 +618,7 @@ mod tests {
     #[test]
     fn cancel_terminal_session_sets_connection_token() {
         let phone = "013800009998";
-        let (sender, _rx) = mpsc::unbounded_channel();
+        let (sender, _rx) = mpsc::channel(8);
         let cancel = Arc::new(AtomicBool::new(false));
         register_terminal_sender(phone, sender, cancel.clone());
         cancel_terminal_session(phone);

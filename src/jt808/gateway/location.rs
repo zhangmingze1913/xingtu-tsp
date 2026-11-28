@@ -9,7 +9,7 @@ pub(super) async fn ingest_location(
     authenticated: bool,
     peer: &str,
     sessions: &mut HashSet<String>,
-    _out_tx: &mpsc::UnboundedSender<Vec<u8>>,
+    _out_tx: &mpsc::Sender<Vec<u8>>,
 ) -> u8 {
     if !authenticated {
         tracing::debug!(terminal = %frame.terminal_id, "location before authentication rejected");
@@ -88,7 +88,7 @@ pub(super) async fn ingest_batch(
     authenticated: bool,
     peer: &str,
     sessions: &mut HashSet<String>,
-    _out_tx: &mpsc::UnboundedSender<Vec<u8>>,
+    _out_tx: &mpsc::Sender<Vec<u8>>,
 ) -> u8 {
     if !authenticated {
         return 1;
