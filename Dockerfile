@@ -9,7 +9,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY seed ./seed
 COPY assets ./assets
-ENV CARGO_BUILD_JOBS=2
+ENV CARGO_BUILD_JOBS=1
 RUN cargo build --release
 
 FROM debian:bookworm-slim

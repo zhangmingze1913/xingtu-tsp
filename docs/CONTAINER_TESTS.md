@@ -385,6 +385,14 @@ Cargo.toml rust-version = "1.100"
 Dockerfile builder = rust:1.100-bookworm
 ```
 
+1.100 Docker 镜像构建实测：
+
+```text
+依赖编译约 46min
+应用 crate 进入链接后 >10min 无输出，已终止
+未把 1.100 Docker 结果写成通过
+```
+
 全链路：
 
 ```powershell
@@ -396,6 +404,7 @@ Dockerfile builder = rust:1.100-bookworm
 Docker 全链路：
 
 ```text
+注意：以下镜像由 rust:1.94.1 构建；1.100 镜像构建未完成
 HTTP 10x20 279.2–337.1 req/s，0 失败
 JT808 鉴权 + 5 点全部 result=0
 dashboard 5.5–15.3 ms

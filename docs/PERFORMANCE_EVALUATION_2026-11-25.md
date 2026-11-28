@@ -489,3 +489,9 @@ Cargo.toml 声明：
 ```toml
 rust-version = "1.100"
 ```
+
+
+### 1.100 Docker 限制
+
+宿主 1.100 测试通过；Docker `rust:1.100-bookworm` 构建在应用 crate 链接阶段长时间无输出，未完成。
+本轮 Docker/K8s 结果来自 `rust:1.94.1` 镜像，不能写成 1.100 镜像结果。
