@@ -597,6 +597,13 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn disabled_terminal_cache_is_fail_open() {
+        let cluster = Cluster::disabled("test-api");
+        assert!(cluster.cached_terminal("013800000001").await.is_none());
+        cluster.invalidate_terminal("013800000001").await;
+    }
+
+    #[tokio::test]
     async fn redis_session_roundtrip() {
         let Ok(url) = std::env::var("TSP_TEST_REDIS_URL") else {
             return;

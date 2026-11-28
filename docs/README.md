@@ -73,7 +73,7 @@ STANDARDS_REASSESSMENT_2026-11-21.md
 
 | 项目 | 状态 |
 | --- | --- |
-| 单元/协议测试 | 301 passed |
+| 单元/协议测试 | 302 passed |
 | 集成测试 | 48 passed |
 | fmt / clippy | clean |
 | PostgreSQL 真实连接 | 已验证（PostGIS 16-3.4 容器） |
@@ -94,3 +94,5 @@ STANDARDS_REASSESSMENT_2026-11-21.md
 - [百万连接软硬件配置建议](../百万连接软硬件配置建议.md)
 
 - [REDIS_CACHE.md](REDIS_CACHE.md)
+
+- [TEST_REPORT_2026-11-28.md](TEST_REPORT_2026-11-28.md)
